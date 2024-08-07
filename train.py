@@ -13,7 +13,12 @@ from petface import PetFaceDataset
 
 
 args = parse_arguments()
-print(args)
+print(f"Command line arguments {args}")
+
+
+if args.seed != -1:
+    pl.seed_everything(args.seed, workers=True)
+
 
 if args.natural_augmentation:
     # Applies the SimCLR view on each one of the "natural" augmentations
@@ -96,6 +101,7 @@ trainer = pl.Trainer(
     sync_batchnorm=True,
     use_distributed_sampler=True,
     logger=wandb_logger,
+    deterministic=False if args.seed == -1 else True,
 )
 trainer.fit(model=model, train_dataloaders=train_dataloader)
 # %%

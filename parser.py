@@ -3,6 +3,8 @@ import argparse
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
+    
+    parser.add_argument("--seed", type=int, default=0, help="Seed")
 
     parser.add_argument("--log_dir", type=str, default="./logs", help="Log directory")
     parser.add_argument(
@@ -12,7 +14,10 @@ def parse_arguments():
         help="Data directory",
     )
     parser.add_argument(
-        "--use_wandb", action="store_true", help="Use Weights & Biases logger"
+        "--use_wandb", 
+        action="store_true", 
+        help="Use Weights & Biases logger",
+        default=False
     )
     parser.add_argument(
         "--resume_chkpt", type=str, default=None, help="Path to checkpoint to resume"
