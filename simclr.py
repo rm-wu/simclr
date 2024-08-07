@@ -1,74 +1,124 @@
-# %%
-import pytorch_lightning as pl
+import math
+from typing import List, Tuple
+
 import torch
-import torchvision
 from torch import nn
+from pytorch_lightning import LightningModule
+from torch import Tensor
+from torch.nn import Identity
+from torchvision.models import resnet50, resnet18
 
-from lightly.loss import NTXentLoss
+from lightly.loss.ntx_ent_loss import NTXentLoss
 from lightly.models.modules import SimCLRProjectionHead
+from lightly.models.utils import get_weight_decay_parameters
+from lightly.transforms import SimCLRTransform
+from lightly.utils.benchmarking import OnlineLinearClassifier
+from lightly.utils.lars import LARS
+from lightly.utils.scheduler import CosineWarmupScheduler
 
 
-class SimCLR(pl.LightningModule):
-    def __init__(
-        self,
-        max_epochs: int = 10,
-        optimizer: str = "SGD",
-        lr: float = 6e-2,
-        momentum: float = 0.9,
-        weight_decay: float = 5e-4,
-        input_size: int = 224,
-        train_batchsize: int = 512,
-        channels: int = 3,
-    ):
+class SimCLR(LightningModule):
+    def __init__(self, backbone: str, batch_size_per_device: int, num_classes: int) -> None:
         super().__init__()
-        self.example_input_array = torch.Tensor(
-            train_batchsize, channels, input_size, input_size
-        )
-        resnet = torchvision.models.resnet18()
+        self.save_hyperparameters()
+        self.batch_size_per_device = batch_size_per_device
+        
+        if backbone == "resnet50":
+            resnet = resnet50()
+            self.projection_head = SimCLRProjectionHead()
+        elif backbone == "resnet18":
+            resnet = resnet18()
+            self.projection_head = SimCLRProjectionHead(
+                input_dim=512, hidden_dim=2048, output_dim=2048
+            )
+        else:
+            raise NotImplementedError(f"Backbone {backbone} not implemented")
+        # Ignore classification head
+        self.feature_dim = resnet.fc.in_features
         self.backbone = nn.Sequential(*list(resnet.children())[:-1])
-        self.projection_head = SimCLRProjectionHead(512, 2048, 2048)
+        self.criterion = NTXentLoss(temperature=0.1, gather_distributed=True)
 
-        # enable gather_distributed to gather features from all gpus
-        # before calculating the loss
-        self.criterion = NTXentLoss(gather_distributed=True)
-
-        self.max_epochs = max_epochs
-        self.train_batchsize = train_batchsize
-        self.input_size = input_size
-        self.channels = channels
-
-        self.optimizer = optimizer
-        self.lr = lr
-        self.momentum = momentum
-        self.weight_decay = weight_decay
+        self.online_classifier = OnlineLinearClassifier(
+            feature_dim=self.feature_dim, num_classes=num_classes
+        )
         self.save_hyperparameters()
 
-    def forward(self, x):
-        x = self.backbone(x).flatten(start_dim=1)
-        z = self.projection_head(x)
-        return z
+    def forward(self, x: Tensor) -> Tensor:
+        return self.backbone(x)
 
-    def training_step(self, batch, batch_index):
-        (x0, x1) = batch[0]
-        z0 = self.forward(x0)
-        z1 = self.forward(x1)
+    def training_step(
+        self, batch: Tuple[List[Tensor], Tensor, List[str]], batch_idx: int
+    ) -> Tensor:
+        views, targets = batch[0], batch[1]
+        features = self.forward(torch.cat(views)).flatten(start_dim=1)
+        z = self.projection_head(features)
+        z0, z1 = z.chunk(len(views))
         loss = self.criterion(z0, z1)
-        self.log("train/loss", loss.item(), prog_bar=True)
-        return loss
+        self.log(
+            "train_loss", loss, prog_bar=True, sync_dist=True, batch_size=len(targets)
+        )
+
+        cls_loss, cls_log = self.online_classifier.training_step(
+            (features.detach(), targets.repeat(len(views))), batch_idx
+        )
+        self.log_dict(cls_log, sync_dist=True, batch_size=len(targets))
+        return loss + cls_loss
+
+    def validation_step(
+        self, batch: Tuple[Tensor, Tensor, List[str]], batch_idx: int
+    ) -> Tensor:
+        images, targets = batch[0], batch[1]
+        features = self.forward(images).flatten(start_dim=1)
+        cls_loss, cls_log = self.online_classifier.validation_step(
+            (features.detach(), targets), batch_idx
+        )
+        self.log_dict(cls_log, prog_bar=True, sync_dist=True, batch_size=len(targets))
+        return cls_loss
 
     def configure_optimizers(self):
-        if self.optimizer == "SGD":
-            optim = torch.optim.SGD(
-                self.parameters(),
-                lr=self.lr,
-                momentum=self.momentum,
-                weight_decay=self.weight_decay,
-            )
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optim, self.max_epochs
-            )
-            return [optim], [scheduler]
-        elif self.optimizer == "LARS":
-            raise NotImplementedError("LARS is not implemented yet")
-        else:
-            raise ValueError(f"Optimizer {self.optimizer} is not supported")
+        # Don't use weight decay for batch norm, bias parameters, and classification
+        # head to improve performance.
+        params, params_no_weight_decay = get_weight_decay_parameters(
+            [self.backbone, self.projection_head]
+        )
+        optimizer = LARS(
+            [
+                {"name": "simclr", "params": params},
+                {
+                    "name": "simclr_no_weight_decay",
+                    "params": params_no_weight_decay,
+                    "weight_decay": 0.0,
+                },
+                {
+                    "name": "online_classifier",
+                    "params": self.online_classifier.parameters(),
+                    "weight_decay": 0.0,
+                },
+            ],
+            # Square root learning rate scaling improves performance for small
+            # batch sizes (<=2048) and few training epochs (<=200). Alternatively,
+            # linear scaling can be used for larger batches and longer training:
+            #   lr=0.3 * self.batch_size_per_device * self.trainer.world_size / 256
+            # See Appendix B.1. in the SimCLR paper https://arxiv.org/abs/2002.05709
+            lr=0.075 * math.sqrt(self.batch_size_per_device * self.trainer.world_size),
+            momentum=0.9,
+            # Note: Paper uses weight decay of 1e-6 but reference code 1e-4. See:
+            # https://github.com/google-research/simclr/blob/2fc637bdd6a723130db91b377ac15151e01e4fc2/README.md?plain=1#L103
+            weight_decay=1e-6,
+        )
+        scheduler = {
+            "scheduler": CosineWarmupScheduler(
+                optimizer=optimizer,
+                warmup_epochs=int(
+                    self.trainer.estimated_stepping_batches
+                    / self.trainer.max_epochs
+                    * 10
+                ),
+                max_epochs=int(self.trainer.estimated_stepping_batches),
+            ),
+            "interval": "step",
+        }
+        return [optimizer], [scheduler]
+
+
+# transform = SimCLRTransform()

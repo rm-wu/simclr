@@ -3,8 +3,11 @@ import argparse
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    
+
     parser.add_argument("--seed", type=int, default=0, help="Seed")
+    parser.add_argument(
+        "--fast_dev_run", action="store_true", help="Fast dev run", default=False
+    )
 
     parser.add_argument("--log_dir", type=str, default="./logs", help="Log directory")
     parser.add_argument(
@@ -14,33 +17,51 @@ def parse_arguments():
         help="Data directory",
     )
     parser.add_argument(
-        "--use_wandb", 
-        action="store_true", 
+        "--use_wandb",
+        action="store_true",
         help="Use Weights & Biases logger",
-        default=False
+        default=False,
     )
     parser.add_argument(
         "--resume_chkpt", type=str, default=None, help="Path to checkpoint to resume"
-    )   
-    
+    )
+
+    parser.add_argument(
+        "--backbone",
+        type=str,
+        default="resnet18",
+        help="Architecture backbone",
+        choices=["resnet18", "resnet50"],
+    )
+
     parser.add_argument("--max_epochs", type=int, default=10, help="Number of epochs")
     parser.add_argument(
-        "--train_batchsize", type=int, default=512, help="Train batch size"
+        "--batch_size_per_device",
+        type=int,
+        default=512,
+        help="Batch size for each device",
     )
     parser.add_argument("--num_workers", type=int, default=16, help="Number of workers")
-    
     parser.add_argument(
-        "--optimizer",
-        type=str,
-        default="SGD",
-        help="Optimizer",
-        choices=["SGD", "LARS"],
+        "--skip_validation",
+        action="store_true",
+        help="Do not perform validation",
+        default=False,
     )
-    parser.add_argument(
-        "--learning_rate", type=float, default=0.06, help="Learning rate"
-    )
-    parser.add_argument("--momentum", type=float, default=0.9, help="Momentum")
-    parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight decay")
+
+    ### Old Implementation
+    # parser.add_argument(
+    #     "--optimizer",
+    #     type=str,
+    #     default="LARS",
+    #     help="Optimizer",
+    #     choices=["SGD", "LARS"],
+    # )
+    # parser.add_argument(
+    #     "--learning_rate", type=float, default=0.06, help="Learning rate"
+    # )
+    # parser.add_argument("--momentum", type=float, default=0.9, help="Momentum")
+    # parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight decay")
 
     parser.add_argument(
         "--natural_augmentation",
