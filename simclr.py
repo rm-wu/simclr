@@ -41,7 +41,6 @@ class SimCLR(LightningModule):
         self.online_classifier = OnlineLinearClassifier(
             feature_dim=self.feature_dim, num_classes=num_classes
         )
-        self.save_hyperparameters()
 
     def forward(self, x: Tensor) -> Tensor:
         return self.backbone(x)
@@ -55,12 +54,14 @@ class SimCLR(LightningModule):
         z0, z1 = z.chunk(len(views))
         loss = self.criterion(z0, z1)
         self.log(
-            "train_loss", loss, prog_bar=True, sync_dist=True, batch_size=len(targets)
+            "train/loss", loss, prog_bar=True, sync_dist=True, batch_size=len(targets)
         )
 
         cls_loss, cls_log = self.online_classifier.training_step(
             (features.detach(), targets.repeat(len(views))), batch_idx
         )
+        cls_log = {k.replace("train_online_", "train_online/"): v 
+                   for k, v in cls_log.items()}
         self.log_dict(cls_log, sync_dist=True, batch_size=len(targets))
         return loss + cls_loss
 
@@ -72,6 +73,8 @@ class SimCLR(LightningModule):
         cls_loss, cls_log = self.online_classifier.validation_step(
             (features.detach(), targets), batch_idx
         )
+        cls_log = {k.replace("val_online_", "val_online/"): 
+                   v for k, v in cls_log.items()}
         self.log_dict(cls_log, prog_bar=True, sync_dist=True, batch_size=len(targets))
         return cls_loss
 
