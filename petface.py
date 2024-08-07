@@ -45,7 +45,7 @@ class PetFaceDataset(Dataset):
         img_path = self.files_df.iloc[index].filename
         img_path = self.root / "images" / img_path
         image = Image.open(img_path).convert("RGB")
-        
+
         if self.natural_augmentation:
             pos = self.get_positive(index)
             if self.transform:
@@ -56,26 +56,21 @@ class PetFaceDataset(Dataset):
             if self.transform:
                 image = self.transform(image)
             return image, 0
-    
 
     def get_positive(self, index):
         image = self.files_df.iloc[index]
-        positives = self.files_df[
-            (self.files_df["label"] == image["label"])
-            & (self.files_df["class"] == image["class"])
-        ]
+        image_path = pl.Path(self.root / "images" / image.filename)
+        positives = list(image_path.parent.glob("*.png"))
 
-        # Remove the comment in case we want to include also the same image
-        # positives = positives.drop(index)
-
+        # Uncomment to remove the current image from the list of positives
+        # positives = [str(p) for p in positives if p != image_path]
+        
         # Select one of the positives
         positive_idx = np.random.randint(len(positives))
-        pos_filename = positives["filename"].tolist()[positive_idx]
-        # print(f"image_path = {image.filename} pos_path   = {pos_filename}")
-        pos_path = self.root / "images" / pos_filename
+        pos_path = positives[positive_idx]
         pos = Image.open(pos_path).convert("RGB")
         return pos
-    
+
 
 if __name__ == "__main__":
     from torchvision import transforms
@@ -99,7 +94,13 @@ if __name__ == "__main__":
     val_img = val_dataset[30_000]
     print(val_img.shape)
 
-    train_loader = DataLoader(dataset=train_dataset, batch_size=256, shuffle=True, drop_last=True, num_workers=16)
+    train_loader = DataLoader(
+        dataset=train_dataset,
+        batch_size=256,
+        shuffle=True,
+        drop_last=True,
+        num_workers=16,
+    )
     print(len(train_loader))
 
     for i, batch in enumerate(train_loader):
