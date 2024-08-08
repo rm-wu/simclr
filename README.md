@@ -4,6 +4,8 @@ This repo is meant to test the use of natural augmentations, meaning using image
 
 The experiments use [PetFace dataset](https://dahlian00.github.io/PetFacePage/).
 
+The implementation builds on top of  [Lightly SSL](https://github.com/lightly-ai/lightly).
+
 ### Install Environment 
 ```bash
 conda create env -f environment.yml
