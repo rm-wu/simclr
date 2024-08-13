@@ -37,4 +37,4 @@ python train.py --use_wandb \
 ```
 
 ### Link to pretrained models
-(GDrive Folder)[https://drive.google.com/drive/folders/1b-zE9rY4wq8UTU_mT359jbg6E7iiZYB1?usp=sharing]
+[GDrive Folder](https://drive.google.com/drive/folders/1b-zE9rY4wq8UTU_mT359jbg6E7iiZYB1?usp=sharing)
