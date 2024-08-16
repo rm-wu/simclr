@@ -10,6 +10,7 @@ from PIL import Image
 
 TRAIN_SPLIT = ['cat', 'chimp', 'chinchilla', 'degus', 'dog', 'ferret', 'guineapig', 'hamster__', 'hedgehog__', 'javasparrow__', 'parakeet', 'pig', 'rabbit']
 VAL_SPLIT = ['cat', 'chimp', 'chinchilla', 'degus', 'dog', 'ferret', 'guineapig', 'hamster', 'hedgehog', 'javasparrow', 'parakeet', 'pig', 'rabbit']
+TEST_SPLIT = ['hamster', 'hedgehog', 'javasparrow']
 
 class PetFaceDataset(Dataset):
     def __init__(
@@ -19,6 +20,7 @@ class PetFaceDataset(Dataset):
         natural_augmentation: bool = False,
         transform: Optional[nn.Module] = None,
         skip_same_img: bool = False,
+        class_names = None
     ):
         if split not in ["train", "val", "test"]:
             raise ValueError(f"split value {split} is not valid")
@@ -30,15 +32,15 @@ class PetFaceDataset(Dataset):
         self.skip_same_img = skip_same_img
 
         self.files_df = pd.DataFrame()
-        self._prepare_metadata()
+        self._prepare_metadata(class_names)
 
-    def _prepare_metadata(self):
+    def _prepare_metadata(self,class_names=None):
         split_dir = self.root / "split"
         for dir in split_dir.glob("*"):
             if self.split == "train":
                 df = pd.read_csv(dir / "train.csv")
                 df["class"] = dir.name
-                if dir.name in TRAIN_SPLIT:
+                if class_names is None or dir.name in class_names:
                     self.files_df = pd.concat([self.files_df, df], ignore_index=True)
             else:
                 df = pd.read_csv(dir / f"{self.split}.txt")

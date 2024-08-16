@@ -13,6 +13,13 @@ from parser import parse_arguments
 from simclr import SimCLR
 from petface import PetFaceDataset
 
+import os
+import wandb
+os.environ["WANDB__SERVICE_WAIT"] = "300"
+TRAIN_SPLIT = ['cat', 'chimp', 'chinchilla', 'degus', 'dog', 'ferret', 'guineapig', 'hamster__', 'hedgehog__', 'javasparrow__', 'parakeet', 'pig', 'rabbit']
+VAL_SPLIT = ['cat', 'chimp', 'chinchilla', 'degus', 'dog', 'ferret', 'guineapig', 'hamster', 'hedgehog', 'javasparrow', 'parakeet', 'pig', 'rabbit']
+TEST_SPLIT = ['hamster', 'hedgehog', 'javasparrow']
+
 
 #### Parse command line arguments
 args = parse_arguments()
@@ -72,6 +79,7 @@ train_dataset = PetFaceDataset(
     split="train",
     transform=transform,
     natural_augmentation=args.natural_augmentation,
+    class_names=TRAIN_SPLIT,
 )
 args.num_classes = len(train_dataset.classes)
 train_dataloader = DataLoader(
@@ -95,7 +103,7 @@ else:
         ]
     )
     val_dataset = PetFaceDataset(
-        root=args.data_dir, split="val", transform=val_transform
+        root=args.data_dir, split="val", transform=val_transform, class_names=VAL_SPLIT
     )
     val_dataloader = DataLoader(
         val_dataset,

@@ -1,40 +1,68 @@
+import pathlib
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from torchvision import transforms as T
 
-#%%
-from pathlib import Path
-import argparse
+import pytorch_lightning as pl
+from pytorch_lightning.loggers import WandbLogger
+from lightly.transforms.simclr_transform import SimCLRViewTransform, SimCLRTransform
+from lightly.transforms.utils import IMAGENET_NORMALIZE
 
-from linear_eval import linear_eval
+from parser import parse_arguments
 from simclr import SimCLR
+from petface import PetFaceDataset
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--checkpoint", type=str, help="Path to the checkpoint file")
-parser.add_argument("--data_dir", type=str, help="Path to the data directory", default="~/projects/ocl/data/PetFace/")
-parser.add_argument("--log_dir", type=str, help="Path to the log directory", default="./logs/linear_eval/")
-parser.add_argument("--devices", type=int, help="Number of devices to use", default=2)
-parser.add_argument("--num_workers", type=int, help="Number of workers to use", default=16)
-args = parser.parse_args()
+TEST_SPLIT = ['hamster', 'hedgehog', 'javasparrow']
 
-# checkpoint = "./logs/simclr/5wci6ivs/checkpoints/epoch=24-step=15475.ckpt"
-chkpt_path = Path(args.checkpoint).resolve()
-model = SimCLR.load_from_checkpoint(chkpt_path)
+args = parse_arguments()
+print(f"Command line arguments {args}")
+# args.ckpt_path = '/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=0-step=2000.ckpt'
 
-#%%
-NUM_CLASSES = 13
-args.data_dir = Path(args.data_dir).expanduser().resolve()
-args.log_dir = Path(args.log_dir).expanduser().resolve()
-batch_size_per_device = model.batch_size_per_device
+#### Set seed for reproducibility
+if args.seed != -1:
+    pl.seed_everything(args.seed, workers=True)
 
-linear_eval(
-    model=model.eval(),
-    num_classes=NUM_CLASSES,
-    train_dir=args.data_dir,
-    val_dir=args.data_dir,
-    log_dir=args.log_dir,
-    batch_size_per_device=batch_size_per_device,
-    num_workers=args.num_workers,
-    accelerator="gpu",
-    devices=args.devices,
+transform = T.Compose(
+    [
+        T.Resize(256),
+        T.CenterCrop(224),
+        T.ToTensor(),
+        T.Normalize(mean=IMAGENET_NORMALIZE["mean"], std=IMAGENET_NORMALIZE["std"]),
+    ]
 )
 
+args.data_dir = pathlib.Path(args.data_dir).expanduser().resolve()
+train_dataset = PetFaceDataset(
+    root=args.data_dir,
+    split="train",
+    transform=transform,
+    class_names=TEST_SPLIT
+)
+args.num_classes = len(train_dataset.classes)
+train_dataloader = DataLoader(
+    train_dataset,
+    batch_size=args.batch_size_per_device,
+    shuffle=True,
+    drop_last=True,
+    num_workers=args.num_workers,
+)
 
-# %%
+model = SimCLR.load_from_checkpoint(args.ckpt_path)
+proj_head = nn.Linear(512, args.num_classes)
+loss = nn.CrossEntropyLoss()
+opt = torch.optim.Adam(proj_head.parameters())
+
+for i,(X,y) in enumerate(train_dataloader):
+	opt.zero_grad()
+	with torch.no_grad():
+		z = model.backbone(X)[:,:,0,0]
+	yhat = proj_head(z)
+	loss_i = loss(yhat,y)
+	loss_i.backward()
+	opt.step()
+	acc = (yhat.argmax(1)==y).float().mean().item()
+	print(f"Step={i}, Acc={acc}")
+	
+
+
