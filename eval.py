@@ -49,20 +49,21 @@ train_dataloader = DataLoader(
 )
 
 model = SimCLR.load_from_checkpoint(args.ckpt_path)
-proj_head = nn.Linear(512, args.num_classes)
+proj_head = nn.Linear(512, args.num_classes).to(model.device)
 loss = nn.CrossEntropyLoss()
 opt = torch.optim.Adam(proj_head.parameters())
 
 for i,(X,y) in enumerate(train_dataloader):
-	opt.zero_grad()
-	with torch.no_grad():
-		z = model.backbone(X)[:,:,0,0]
-	yhat = proj_head(z)
-	loss_i = loss(yhat,y)
-	loss_i.backward()
-	opt.step()
-	acc = (yhat.argmax(1)==y).float().mean().item()
-	print(f"Step={i}, Acc={acc}")
+    opt.zero_grad()
+    X = X.to(model.device)
+    with torch.no_grad():
+        z = model.backbone(X)[:,:,0,0]
+    yhat = proj_head(z)
+    loss_i = loss(yhat,y)
+    loss_i.backward()
+    opt.step()
+    acc = (yhat.argmax(1)==y).float().mean().item()
+    print(f"Step={i}, Acc={acc}")
 	
 
 

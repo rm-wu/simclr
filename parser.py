@@ -101,6 +101,13 @@ def parse_arguments():
         "--accelerator", default="gpu", choices=["gpu", "cpu"], help="Use GPU or CPU"
     )
     parser.add_argument("--devices", default=2, type=int, help="Number of devices")
+    
+    parser.add_argument(
+        "--ckpt_path",
+        type=str,
+        default="/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=0-step=3000.ckpt",
+        help="Checkpoint directory",
+    )    
 
     args = parser.parse_args()
     return args
