@@ -8,6 +8,8 @@ import pandas as pd
 from pathlib import Path
 from PIL import Image
 
+TRAIN_SPLIT = ['cat', 'chimp', 'chinchilla', 'degus', 'dog', 'ferret', 'guineapig', 'hamster__', 'hedgehog__', 'javasparrow__', 'parakeet', 'pig', 'rabbit']
+VAL_SPLIT = ['cat', 'chimp', 'chinchilla', 'degus', 'dog', 'ferret', 'guineapig', 'hamster', 'hedgehog', 'javasparrow', 'parakeet', 'pig', 'rabbit']
 
 class PetFaceDataset(Dataset):
     def __init__(
@@ -36,11 +38,13 @@ class PetFaceDataset(Dataset):
             if self.split == "train":
                 df = pd.read_csv(dir / "train.csv")
                 df["class"] = dir.name
+                if dir.name in TRAIN_SPLIT:
+                    self.files_df = pd.concat([self.files_df, df], ignore_index=True)
             else:
                 df = pd.read_csv(dir / f"{self.split}.txt")
                 df.columns = ["filename"]
                 df["class"] = dir.name
-            self.files_df = pd.concat([self.files_df, df], ignore_index=True)
+                self.files_df = pd.concat([self.files_df, df], ignore_index=True)
 
     def __len__(self):
         return len(self.files_df)
@@ -83,8 +87,8 @@ if __name__ == "__main__":
     from torchvision import transforms
     from torch.utils.data import DataLoader
 
-    DATA_PATH = Path("~/projects/ocl/data/PetFace/").expanduser().resolve()
-    
+    DATA_PATH = Path("/mnt/qb/work/bethge/cyildiz40/simclr/PetFace/").expanduser().resolve()
+
     transform = transforms.ToTensor()
     train_dataset = PetFaceDataset(
         root=DATA_PATH, split="train", transform=transform

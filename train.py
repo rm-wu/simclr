@@ -5,6 +5,7 @@ from torchvision import transforms as T
 
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import ModelCheckpoint 
 from lightly.transforms.simclr_transform import SimCLRViewTransform, SimCLRTransform
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 
@@ -125,18 +126,22 @@ model = SimCLR(
 
 # Train with DDP and use Synchronized Batch Norm for a more accurate batch norm
 # calculation. Distributed sampling is also enabled with replace_sampler_ddp=True.
+name="petface-nat" if args.natural_augmentation else "petface"
+checkpoint_callback = ModelCheckpoint(every_n_train_steps=1000, dirpath=f'/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/{name}')
+
 trainer = pl.Trainer(
     max_epochs=args.max_epochs,
     # limit_train_batches=0.01,
     fast_dev_run=args.fast_dev_run,
     # profiler="simple",
     default_root_dir=args.log_dir,
-    devices=args.devices,
-    accelerator=args.accelerator,
-    strategy="ddp",
-    sync_batchnorm=True,
-    use_distributed_sampler=True,
+    # devices=args.devices,
+    # accelerator=args.accelerator,
+    # strategy="ddp",
+    # sync_batchnorm=True,
+    # use_distributed_sampler=True,
     logger=wandb_logger,
+    callbacks=[checkpoint_callback],
     deterministic=False if args.seed == -1 else True,
 )
 trainer.fit(
