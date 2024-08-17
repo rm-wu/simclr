@@ -16,7 +16,7 @@ scontrol show job=$SLURM_JOB_ID
 
 source ~/.bashrc
 conda activate riccardo
-python eval.py --num_workers 8 --batch_size_per_device=64 --max_epochs=10 --ckpt_path=/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=1-step=5000.ckpt --data_dir=/mnt/qb/work/bethge/cyildiz40/simclr/PetFace --seed=42 
 
-# python runner.py --use_wandb --batch_size 64 --num_enc_filt 64 --num_dec_filt 64 --lamb0 100 --lamb1 1000 --q 64 --num_groups 4 --num_epoch 10 --num_tasks 2 --split random --num_shapes 8 --q_shp 64 --act_fn GELU --dataset idsprites --hard --use_gt_interv --num_frames 2 --object_flow --resnet
-# python runner.py --batch_size 64 --num_enc_filt 64 --num_dec_filt 64 --plot_interval 500  --lamb0 100 --lamb1 10000 --q 8 --num_groups 4 --num_epoch 200 --split random --num_shapes 10 --q_shp 16 --use_gt_shapes --act_fn GELU --dataset idsprites --hard --node --solver 'rk4' --positive_t 
+# python linear_prob.py --num_workers 8 --batch_size_per_device=64 --max_epochs=10 --ckpt_path=/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=9-step=48000.ckpt --data_dir=/mnt/qb/work/bethge/cyildiz40/simclr/PetFace --seed=42 
+
+python retrieval_task.py --ckpt_path=/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface-nat/epoch=8-step=43000.ckpt --data_dir=/mnt/qb/work/bethge/cyildiz40/simclr/PetFace 

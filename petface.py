@@ -46,7 +46,8 @@ class PetFaceDataset(Dataset):
                 df = pd.read_csv(dir / f"{self.split}.txt")
                 df.columns = ["filename"]
                 df["class"] = dir.name
-                self.files_df = pd.concat([self.files_df, df], ignore_index=True)
+                if class_names is None or dir.name in class_names:
+                    self.files_df = pd.concat([self.files_df, df], ignore_index=True)
 
     def __len__(self):
         return len(self.files_df)
