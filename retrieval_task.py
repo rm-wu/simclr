@@ -96,7 +96,18 @@ for i in range(500):
     answers[c] = answers[c] + [acc]
 
 print([float(np.mean(ans)) for ans in answers])
-print(np.mean([a for ans in answers for a in ans]))
+print(np.mean([a for ans in answers for a in and]))
+
+
+# def plot_10_images(all_images,most_sims,c):
+#     fig,axs = plt.subplots(1,10,figsize=(20,2))
+#     axs[0].imshow(all_images[0].permute(1,2,0)*torch.tensor(IMAGENET_NORMALIZE["std"]).unsqueeze(0).unsqueeze(0) + torch.tensor(IMAGENET_NORMALIZE["mean"]).unsqueeze(0).unsqueeze(0))
+#     for i in range(9):
+#         axs[i+1].imshow(all_images[most_sims[i]].permute(1,2,0)*torch.tensor(IMAGENET_NORMALIZE["std"]).unsqueeze(0).unsqueeze(0) + torch.tensor(IMAGENET_NORMALIZE["mean"]).unsqueeze(0).unsqueeze(0))
+#         axs[i+1].axis('off')
+#     plt.tight_layout()
+#     plt.savefig(f'same_images_{c}.png')
+#     plt.close()
 
 
 # simclr - with head - 0.33
