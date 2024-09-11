@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import os,numpy as np
 from torchvision import transforms as T
-from simclr import SimCLR
+from methods.simclr import SimCLR
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 from parser import parse_arguments
 

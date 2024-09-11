@@ -11,7 +11,7 @@ from lightly.transforms.simclr_transform import SimCLRViewTransform, SimCLRTrans
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 
 from parser import parse_arguments
-from simclr import SimCLR
+from methods.simclr import SimCLR
 from petface import PetFaceDataset
 
 TEST_SPLIT = ['hamster', 'hedgehog', 'javasparrow']
