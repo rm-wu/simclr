@@ -9,6 +9,9 @@ def parse_arguments():
         "--fast_dev_run", action="store_true", help="Fast dev run", default=False
     )
 
+    parser.add_argument("--method", type=str, default="simclr",
+                        choices=["simclr", "vicreg"], help="SSL method")
+
     parser.add_argument("--log_dir", type=str, default="./logs", help="Log directory")
     parser.add_argument(
         "--data_dir",
@@ -105,7 +108,8 @@ def parse_arguments():
     parser.add_argument(
         "--ckpt_path",
         type=str,
-        default="/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=0-step=3000.ckpt",
+        default=None,
+        # default="/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=0-step=3000.ckpt",
         help="Checkpoint directory",
     )    
 

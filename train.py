@@ -11,6 +11,7 @@ from lightly.transforms.utils import IMAGENET_NORMALIZE
 
 from parser import parse_arguments
 from simclr import SimCLR
+from models import VICReg
 from petface import PetFaceDataset
 
 import os
@@ -32,7 +33,7 @@ if args.seed != -1:
 #### Set up Weights & Biases logger
 if args.use_wandb:
     wandb_logger = WandbLogger(
-        project="simclr",
+        project="nat_aug",
         name="petface-nat" if args.natural_augmentation else "petface",
         save_dir=args.log_dir,
     )
@@ -113,33 +114,30 @@ else:
         persistent_workers=False,
     )
 
-
-# # Old implementation
-# from simplified_simclr import SimCLR as SimplifiedSimCLR
-# model = SimplifiedSimCLR(
-#     # backbone=args.backbone,
-#     max_epochs=args.max_epochs,
-#     lr=args.learning_rate,
-#     momentum=args.momentum,
-#     weight_decay=args.weight_decay,
-#     input_size=args.input_size,
-#     train_batchsize=args.batch_size_per_device,
-# )
-
-model = SimCLR(
-    backbone=args.backbone,
-    batch_size_per_device=args.batch_size_per_device,
-    num_classes=args.num_classes,
-)
+if args.method == "simclr": 
+    model = SimCLR(
+        backbone=args.backbone,
+        batch_size_per_device=args.batch_size_per_device,
+        num_classes=args.num_classes,
+    )
+elif args.method == "vicreg":
+    model = VICReg(
+        backbone=args.backbone,
+        batch_size_per_device=args.batch_size_per_device,
+        num_classes=args.num_classes,
+    )
+elif args.method == "dino":
+    raise NotImplementedError
 
 # Train with DDP and use Synchronized Batch Norm for a more accurate batch norm
 # calculation. Distributed sampling is also enabled with replace_sampler_ddp=True.
-name="petface-nat" if args.natural_augmentation else "petface"
-checkpoint_callback = ModelCheckpoint(every_n_train_steps=1000, dirpath=f'/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/{name}')
+name=f"{args.method}-petface-nat" if args.natural_augmentation else f"{args.method}-petface"
+print(name)
+checkpoint_callback = ModelCheckpoint(every_n_train_steps=10, dirpath=f'logs/nat_aug/{name}')
 
 trainer = pl.Trainer(
     max_epochs=args.max_epochs,
-    # limit_train_batches=0.01,
+    limit_train_batches=0.10,
     fast_dev_run=args.fast_dev_run,
     # profiler="simple",
     default_root_dir=args.log_dir,
@@ -151,10 +149,12 @@ trainer = pl.Trainer(
     logger=wandb_logger,
     callbacks=[checkpoint_callback],
     deterministic=False if args.seed == -1 else True,
+    # log_every_n_steps=5,
+    # enable_progress_bar=False
 )
 trainer.fit(
     model=model,
     train_dataloaders=train_dataloader,
     val_dataloaders=val_dataloader,
+    ckpt_path=args.ckpt_path
 )
-# %%
