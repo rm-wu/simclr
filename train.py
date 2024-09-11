@@ -136,7 +136,7 @@ checkpoint_callback = ModelCheckpoint(every_n_train_steps=10, dirpath=f'logs/nat
 
 trainer = pl.Trainer(
     max_epochs=args.max_epochs,
-    limit_train_batches=0.10,
+    #limit_train_batches=0.10,
     fast_dev_run=args.fast_dev_run,
     # profiler="simple",
     default_root_dir=args.log_dir,
