@@ -7,10 +7,11 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint 
 from lightly.transforms.simclr_transform import SimCLRViewTransform, SimCLRTransform
+from lightly.transforms.dino_transform import DINOViewTransform, DINOTransform
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 
 from parser import parse_arguments
-from methods import SimCLR, VICReg
+from methods import SimCLR, VICReg, DINO
 from petface import PetFaceDataset
 
 import os
@@ -40,36 +41,44 @@ else:
     wandb_logger = None
 
 #### Select the typology of augmentation to use in the experiment
-if args.natural_augmentation:
-    # Applies the SimCLR view on each one of the "natural" augmentations
-    # Note: This alters the default SimCLR augmentation because uses different
-    # images.
-    transform = SimCLRViewTransform(
-        input_size=args.input_size,
-        cj_prob=args.cj_prob,
-        cj_strength=args.cj_strength,
-        cj_bright=args.cj_bright,
-        cj_contrast=args.cj_contrast,
-        cj_sat=args.cj_sat,
-        cj_hue=args.cj_hue,
-        min_scale=args.min_scale,
-        random_gray_scale=args.random_gray_scale,
-        gaussian_blur=args.gaussian_blur,
+if args.method in ["simclr", "vicreg"]:
+    if args.natural_augmentation:
+        # Applies the SimCLR view on each one of the "natural" augmentations
+        # Note: This alters the default SimCLR augmentation because uses different
+        # images.
+        transform = SimCLRViewTransform(
+            input_size=args.input_size,
+            cj_prob=args.cj_prob,
+            cj_strength=args.cj_strength,
+            cj_bright=args.cj_bright,
+            cj_contrast=args.cj_contrast,
+            cj_sat=args.cj_sat,
+            cj_hue=args.cj_hue,
+            min_scale=args.min_scale,
+            random_gray_scale=args.random_gray_scale,
+            gaussian_blur=args.gaussian_blur,
+        )
+    else:
+        # Applies the default SimCLR transforms and generates two views
+        transform = SimCLRTransform(
+            input_size=args.input_size,
+            cj_prob=args.cj_prob,
+            cj_strength=args.cj_strength,
+            cj_bright=args.cj_bright,
+            cj_contrast=args.cj_contrast,
+            cj_sat=args.cj_sat,
+            cj_hue=args.cj_hue,
+            min_scale=args.min_scale,
+            random_gray_scale=args.random_gray_scale,
+            gaussian_blur=args.gaussian_blur,
+        )
+elif args.method == "dino":
+    transform = DINOTransform(
+        global_crop_scale=(0.14, 1), 
+        local_crop_scale=(0.05, 0.14)
     )
 else:
-    # Applies the default SimCLR transforms and generates two views
-    transform = SimCLRTransform(
-        input_size=args.input_size,
-        cj_prob=args.cj_prob,
-        cj_strength=args.cj_strength,
-        cj_bright=args.cj_bright,
-        cj_contrast=args.cj_contrast,
-        cj_sat=args.cj_sat,
-        cj_hue=args.cj_hue,
-        min_scale=args.min_scale,
-        random_gray_scale=args.random_gray_scale,
-        gaussian_blur=args.gaussian_blur,
-    )
+    raise ValueError(f"No augmentations implemented for {args.method}")
 
 #### Create Dataset and DataLoaders
 # DATA_PATH = pathlib.Path("~/projects/ocl/data/PetFace/").expanduser().resolve()
@@ -126,17 +135,20 @@ elif args.method == "vicreg":
         num_classes=args.num_classes,
     )
 elif args.method == "dino":
-    raise NotImplementedError
+    model = DINO(
+        backbone=args.backbone,
+        batch_size_per_device=args.batch_size_per_device,
+        num_classes=args.num_classes
+    )
 
 # Train with DDP and use Synchronized Batch Norm for a more accurate batch norm
 # calculation. Distributed sampling is also enabled with replace_sampler_ddp=True.
 name=f"{args.method}-petface-nat" if args.natural_augmentation else f"{args.method}-petface"
-print(name)
 checkpoint_callback = ModelCheckpoint(every_n_train_steps=10, dirpath=f'logs/nat_aug/{name}')
 
 trainer = pl.Trainer(
     max_epochs=args.max_epochs,
-    #limit_train_batches=0.10,
+    # limit_train_batches=0.10,
     fast_dev_run=args.fast_dev_run,
     # profiler="simple",
     default_root_dir=args.log_dir,
@@ -151,6 +163,7 @@ trainer = pl.Trainer(
     # log_every_n_steps=5,
     # enable_progress_bar=False
 )
+
 trainer.fit(
     model=model,
     train_dataloaders=train_dataloader,

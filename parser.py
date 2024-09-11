@@ -10,7 +10,7 @@ def parse_arguments():
     )
 
     parser.add_argument("--method", type=str, default="simclr",
-                        choices=["simclr", "vicreg"], help="SSL method")
+                        choices=["simclr", "vicreg", "dino"], help="SSL method")
 
     parser.add_argument("--log_dir", type=str, default="./logs", help="Log directory")
     parser.add_argument(
