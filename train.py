@@ -33,7 +33,7 @@ if args.seed != -1:
 if args.use_wandb:
     wandb_logger = WandbLogger(
         project="nat_aug",
-        name="petface-nat" if args.natural_augmentation else "petface",
+        name=f"{args.method}_petface-nat" if args.natural_augmentation else f"{args.method}_petface",
         save_dir=args.log_dir,
     )
 else:
