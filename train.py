@@ -7,11 +7,12 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint 
 from lightly.transforms.simclr_transform import SimCLRViewTransform, SimCLRTransform
-from lightly.transforms.dino_transform import DINOViewTransform, DINOTransform
+from lightly.transforms.dino_transform import DINOTransform
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 
 from parser import parse_arguments
 from methods import SimCLR, VICReg, DINO
+from transforms import DINONaturalTransform, SimCLRNaturalTransform
 from petface import PetFaceDataset
 
 import os
@@ -46,7 +47,7 @@ if args.method in ["simclr", "vicreg"]:
         # Applies the SimCLR view on each one of the "natural" augmentations
         # Note: This alters the default SimCLR augmentation because uses different
         # images.
-        transform = SimCLRViewTransform(
+        transform = SimCLRNaturalTransform(
             input_size=args.input_size,
             cj_prob=args.cj_prob,
             cj_strength=args.cj_strength,
@@ -73,10 +74,16 @@ if args.method in ["simclr", "vicreg"]:
             gaussian_blur=args.gaussian_blur,
         )
 elif args.method == "dino":
-    transform = DINOTransform(
-        global_crop_scale=(0.14, 1), 
-        local_crop_scale=(0.05, 0.14)
-    )
+    if args.natural_augmentation:
+        transform = DINONaturalTransform(
+            global_crop_scale=(0.14, 1),
+            local_crop_scale=(0.05, 0.14)
+        )
+    else:
+        transform = DINOTransform(
+            global_crop_scale=(0.14, 1), 
+            local_crop_scale=(0.05, 0.14)
+        )
 else:
     raise ValueError(f"No augmentations implemented for {args.method}")
 
@@ -152,7 +159,7 @@ trainer = pl.Trainer(
     fast_dev_run=args.fast_dev_run,
     # profiler="simple",
     default_root_dir=args.log_dir,
-    # devices=args.devices,
+    devices=args.devices, 
     # accelerator=args.accelerator,
     # strategy="ddp",
     # sync_batchnorm=True,

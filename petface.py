@@ -62,13 +62,12 @@ class PetFaceDataset(Dataset):
         if self.natural_augmentation:
             pos = self.get_positive(index)
             if self.transform:
-                image = self.transform(image)
-                pos = self.transform(pos)
-            return [image, pos], target
+                views = self.transform([image, pos]) 
+            return views, target
         else:
             if self.transform:
-                image = self.transform(image)
-            return image, target
+                views = self.transform(image)
+            return views, target
 
     def get_positive(self, index):
         image = self.files_df.iloc[index]
