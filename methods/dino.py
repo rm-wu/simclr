@@ -1,5 +1,5 @@
 import copy
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Sequence
 
 import torch
 from pytorch_lightning import LightningModule
@@ -8,6 +8,7 @@ import torch.nn as nn
 from torch.optim import SGD
 from torch.optim.optimizer import Optimizer
 from torchvision.models import resnet50, resnet18
+from torchvision import transforms as T
 
 from lightly.loss import DINOLoss
 from lightly.models.modules import DINOProjectionHead
@@ -106,7 +107,7 @@ class DINO(LightningModule):
             epoch=self.current_epoch,
         )
         self.log_dict(
-            {"train_loss": loss, "ema_momentum": momentum},
+            {"train/loss": loss, "train/ema_momentum": momentum},
             prog_bar=True,
             sync_dist=True,
             batch_size=len(targets),
@@ -116,6 +117,8 @@ class DINO(LightningModule):
         cls_loss, cls_log = self.online_classifier.training_step(
             (teacher_features.chunk(2)[0].detach(), targets), batch_idx
         )
+        cls_log = {k.replace("train_online_", "train_online/"): v 
+                   for k, v in cls_log.items()}
         self.log_dict(cls_log, sync_dist=True, batch_size=len(targets))
         return loss + cls_loss
 
