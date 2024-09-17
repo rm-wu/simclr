@@ -6,6 +6,7 @@ import torch
 import torchvision
 from torch import nn
 from torch import Tensor
+from torch.optim import AdamW
 
 from lightly.loss import PMSNLoss
 from lightly.models import utils
@@ -13,6 +14,7 @@ from lightly.models.modules import MaskedVisionTransformerTorchvision
 from lightly.models.modules.heads import MSNProjectionHead
 from lightly.transforms import MSNTransform
 from lightly.utils.benchmarking import OnlineLinearClassifier
+from lightly.utils.scheduler import CosineWarmupScheduler
 
 
 class PMSN(pl.LightningModule):
@@ -110,15 +112,65 @@ class PMSN(pl.LightningModule):
         return cls_loss
 
 
-
     def configure_optimizers(self):
-        params = [
-            *list(self.anchor_backbone.parameters()),
-            *list(self.anchor_projection_head.parameters()),
-            self.prototypes,
-        ]
-        optim = torch.optim.AdamW(params, lr=1.5e-4)
-        return optim
+        # Don't use weight decay for batch norm, bias parameters, and classification
+        # head to improve performance.
+        params, params_no_weight_decay = utils.get_weight_decay_parameters(
+            [self.backbone, self.projection_head]
+        )
+        optimizer = AdamW(
+            [
+                {"name": "pmsn", "params": params},
+                {
+                    "name": "pmsn_no_weight_decay",
+                    "params": params_no_weight_decay,
+                    "weight_decay": 0.0,
+                },
+                {
+                    "name": "online_classifier",
+                    "params": self.online_classifier.parameters(),
+                    "weight_decay": 0.0,
+                },
+            ],
+            lr=1.5e-4 * self.batch_size_per_device * self.trainer.world_size / 256,
+            weight_decay=0.05,
+            betas=(0.9, 0.95),
+        )
+        scheduler = {
+            "scheduler": CosineWarmupScheduler(
+                optimizer=optimizer,
+                warmup_epochs=(
+                    self.trainer.estimated_stepping_batches
+                    / self.trainer.max_epochs
+                    * 40
+                ),
+                max_epochs=self.trainer.estimated_stepping_batches,
+            ),
+            "interval": "step",
+        }
+        return [optimizer], [scheduler]
+    
+    def configure_gradient_clipping(
+        self,
+        optimizer: Optimizer,
+        gradient_clip_val: Union[int, float, None] = None,
+        gradient_clip_algorithm: Union[str, None] = None,
+    ) -> None:
+        self.clip_gradients(
+            optimizer=optimizer,
+            gradient_clip_val=3.0,
+            gradient_clip_algorithm="norm",
+        )
+        # self.student_projection_head.cancel_last_layer_gradients(self.current_epoch)
+
+    # def configure_optimizers(self):
+    #     params = [
+    #         *list(self.anchor_backbone.parameters()),
+    #         *list(self.anchor_projection_head.parameters()),
+    #         self.prototypes,
+    #     ]
+    #     optim = torch.optim.AdamW(params, lr=1.5e-4)
+    #     return optim
 
 
 # model = PMSN()
