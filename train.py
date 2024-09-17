@@ -6,13 +6,14 @@ from torchvision import transforms as T
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint 
-from lightly.transforms.simclr_transform import SimCLRViewTransform, SimCLRTransform
+from lightly.transforms.simclr_transform import SimCLRTransform
 from lightly.transforms.dino_transform import DINOTransform
+from lightly.transforms.msn_transform import MSNTransform
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 
 from parser import parse_arguments
-from methods import SimCLR, VICReg, DINO
-from transforms import DINONaturalTransform, SimCLRNaturalTransform
+from methods import SimCLR, VICReg, DINO, PMSN
+from transforms import DINONaturalTransform, SimCLRNaturalTransform, MSNNaturalTransform
 from petface import PetFaceDataset
 
 import os
@@ -84,6 +85,11 @@ elif args.method == "dino":
             global_crop_scale=(0.14, 1), 
             local_crop_scale=(0.05, 0.14)
         )
+if args.method == "pmsn":
+    if args.natural_augmentation:
+        transform = MSNNaturalTransform()
+    else:
+        transform = MSNTransform()
 else:
     raise ValueError(f"No augmentations implemented for {args.method}")
 
@@ -147,6 +153,11 @@ elif args.method == "dino":
         batch_size_per_device=args.batch_size_per_device,
         num_classes=args.num_classes
     )
+elif args.method == "pmsn":
+    model = PMSN(
+        batch_size_per_device=args.batch_size_per_device,
+        num_classes=args.num_classes
+    )
 
 # Train with DDP and use Synchronized Batch Norm for a more accurate batch norm
 # calculation. Distributed sampling is also enabled with replace_sampler_ddp=True.
@@ -155,7 +166,7 @@ checkpoint_callback = ModelCheckpoint(every_n_train_steps=10, dirpath=f'logs/nat
 
 trainer = pl.Trainer(
     max_epochs=args.max_epochs,
-    # limit_train_batches=0.10,
+    limit_train_batches=args.limit_train_batches,
     fast_dev_run=args.fast_dev_run,
     # profiler="simple",
     default_root_dir=args.log_dir,

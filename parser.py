@@ -8,9 +8,12 @@ def parse_arguments():
     parser.add_argument(
         "--fast_dev_run", action="store_true", help="Fast dev run", default=False
     )
-
+    parser.add_argument(
+        "--limit_train_batches", type=float, default=None, 
+        help="Use a subset of training data for debugging"
+    )
     parser.add_argument("--method", type=str, default="simclr",
-                        choices=["simclr", "vicreg", "dino"], help="SSL method")
+                        choices=["simclr", "vicreg", "dino",  "pmsn"], help="SSL method")
 
     parser.add_argument("--log_dir", type=str, default="./logs", help="Log directory")
     parser.add_argument(
@@ -51,21 +54,6 @@ def parse_arguments():
         help="Do not perform validation",
         default=False,
     )
-
-    ### Old Implementation
-    # parser.add_argument(
-    #     "--optimizer",
-    #     type=str,
-    #     default="LARS",
-    #     help="Optimizer",
-    #     choices=["SGD", "LARS"],
-    # )
-    # parser.add_argument(
-    #     "--learning_rate", type=float, default=0.06, help="Learning rate"
-    # )
-    # parser.add_argument("--momentum", type=float, default=0.9, help="Momentum")
-    # parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight decay")
-
     parser.add_argument(
         "--natural_augmentation",
         action="store_true",
@@ -111,7 +99,7 @@ def parse_arguments():
         default=None,
         # default="/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=0-step=3000.ckpt",
         help="Checkpoint directory",
-    )    
+    )
 
     args = parser.parse_args()
     return args

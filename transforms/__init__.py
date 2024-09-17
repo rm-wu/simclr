@@ -1,2 +1,3 @@
 from .dino_nat_transform import DINONaturalTransform
 from .simclr_nat_transform import SimCLRNaturalTransform
+from .msn_nat_transform import MSNNaturalTransform
