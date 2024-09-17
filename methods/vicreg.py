@@ -74,6 +74,8 @@ class VICReg(LightningModule):
         cls_loss, cls_log = self.online_classifier.validation_step(
             (features.detach(), targets), batch_idx
         )
+        cls_log = {k.replace("val_online_", "val_online/"): 
+                   v for k, v in cls_log.items()}
         self.log_dict(cls_log, prog_bar=True, sync_dist=True, batch_size=len(targets))
         return cls_loss
 
