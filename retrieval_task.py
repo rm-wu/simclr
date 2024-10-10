@@ -8,8 +8,12 @@ from methods.simclr import SimCLR
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 from parser import parse_arguments
 
+import pytorch_lightning as pl
+
 args = parse_arguments()
 print(f"Command line arguments {args}")
+
+if args.seed != -1: pl.seed_everything(args.seed)
 
 MAIN_FOLDER = args.data_dir
 all_classes = os.listdir(os.path.join(args.data_dir,'split'))
@@ -44,11 +48,19 @@ for class_ in all_classes:
     LABELS.append(torch.tensor(labels)) # [256]
     print(class_, 'completed')
 
-try:
+from methods import SimCLR, DINO, VICReg
+if args.method == "simclr":
     model = SimCLR.load_from_checkpoint(args.ckpt_path)
-except:
-    # model = SimCLR.load_from_checkpoint('/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=9-step=48000.ckpt')
-    model = SimCLR.load_from_checkpoint('/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface-nat/epoch=8-step=42000.ckpt')
+elif args.method == "dino":
+    model = DINO.load_from_checkpoint(args.ckpt_path)
+elif args.method == "vicreg":
+    model = VICReg.load_from_checkpoint(args.ckpt_path)
+
+# try:
+#     model = SimCLR.load_from_checkpoint(args.ckpt_path)
+# except:
+#     # model = SimCLR.load_from_checkpoint('/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=9-step=48000.ckpt')
+#     model = SimCLR.load_from_checkpoint('/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface-nat/epoch=8-step=42000.ckpt')
 
 def animal_identity_identify(num_neg):
     while True:
@@ -88,16 +100,15 @@ for i in range(500):
     all_images,c = animal_type_identify(num_neg)
     with torch.no_grad():
         Z = model.backbone(all_images.to(model.device))[:,:,0,0]
-        Z = model.projection_head(Z)
+        # Z = model.projection_head(Z) 
     Z = nn.functional.normalize(Z, dim=1)
     sims = (Z[0] * Z[1:]).sum(-1)
     acc  = (sims.argmax()==0).int().item()
     # print(c,acc)
     answers[c] = answers[c] + [acc]
 
-print([float(np.mean(ans)) for ans in answers])
-print(np.mean([a for ans in answers for a in and]))
-
+print([(cls_name, float(np.mean(ans))) for cls_name, ans in zip(all_classes, answers)])
+print(np.mean([a for ans in answers for a in ans]))
 
 # def plot_10_images(all_images,most_sims,c):
 #     fig,axs = plt.subplots(1,10,figsize=(20,2))

@@ -20,3 +20,5 @@ conda activate riccardo
 # python linear_prob.py --num_workers 8 --batch_size_per_device=64 --max_epochs=10 --ckpt_path=/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface/epoch=9-step=48000.ckpt --data_dir=/mnt/qb/work/bethge/cyildiz40/simclr/PetFace --seed=42 
 
 python retrieval_task.py --ckpt_path=/mnt/qb/work/bethge/cyildiz40/simclr/logs/lightning/petface-nat/epoch=8-step=43000.ckpt --data_dir=/mnt/qb/work/bethge/cyildiz40/simclr/PetFace 
+
+# python retrieval_task.py --ckpt_path=/home/mereur1/projects/ocl/ssl_nat_aug/logs/mahti/vicreg_petface.ckpt --data_dir=/home/mereur1/projects/ocl/data/PetFace
