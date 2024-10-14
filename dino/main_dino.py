@@ -298,7 +298,7 @@ def train_dino(args, logger):
 
     start_time = time.time()
     print("Starting DINO training !")
-    for epoch in trange(start_epoch, args.epochs):
+    for epoch in trange(start_epoch, args.epochs, ncols=100, desc="Epochs"):
         data_loader.sampler.set_epoch(epoch)
 
         # ============ training one epoch of DINO ... ============
@@ -336,7 +336,12 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Epoch: [{}/{}]'.format(epoch, args.epochs)
     
-    pbar = tqdm(data_loader, ncols=100, desc="Training")
+    if utils.is_main_process():
+        pbar = tqdm(enumerate(data_loader), total=len(data_loader), 
+                    desc=header, ncols=100, leave=False)
+    else:
+        pbar = enumerate(data_loader)
+    # pbar = tqdm(data_loader, ncols=100, desc="Training")
     # pbar = tqdm(enumerate(data_loader), total=len(data_loader), 
     #             desc=header, ncols=100, leave=False)
     for it, (images, _) in enumerate(pbar):
@@ -360,7 +365,12 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
             student_output = student(images)
             loss = dino_loss(student_output, teacher_output, epoch)
         
-        pbar.set_postfix(loss=f"{loss.item():.4f}")
+        # pbar.set_postfix(loss=f"{loss.item():.4f}")
+        if utils.is_main_process():
+            pbar.set_postfix({
+                'loss': f'{loss.item():.4f}',
+                'lr': f'{optimizer.param_groups[0]["lr"]:.6f}'
+            })
         # print(loss.item())
 
         if not math.isfinite(loss.item()):
