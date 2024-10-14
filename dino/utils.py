@@ -32,6 +32,10 @@ from torch import nn
 import torch.distributed as dist
 from PIL import ImageFilter, ImageOps
 
+import argparse
+import warnings
+from torch import Tensor
+
 
 class GaussianBlur(object):
     """
@@ -464,46 +468,84 @@ def setup_for_distributed(is_master):
     __builtin__.print = print
 
 
+# def init_distributed_mode(args):
+#     # launched with torch.distributed.launch
+#     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+#         args.rank = int(os.environ["RANK"])
+#         args.world_size = int(os.environ['WORLD_SIZE'])
+#         args.gpu = int(os.environ['LOCAL_RANK'])
+#     # launched with submitit on a slurm cluster
+#     elif 'SLURM_PROCID' in os.environ:
+#         args.rank = int(os.environ['SLURM_PROCID'])
+#         args.gpu = args.rank % torch.cuda.device_count()
+#     # launched naively with `python main_dino.py`
+#     # we manually add MASTER_ADDR and MASTER_PORT to env variables
+#     elif torch.cuda.is_available():
+#         print('Will run the code on one GPU.')
+#         args.rank, args.gpu, args.world_size = 0, 0, 1
+#         os.environ['MASTER_ADDR'] = '127.0.0.1'
+#         os.environ['MASTER_PORT'] = '29500'
+#     else:
+#         print('Does not support training without GPU.')
+#         sys.exit(1)
+
+#     # dist.init_process_group(
+#     #     backend="nccl",
+#     #     init_method=args.dist_url,
+#     #     world_size=args.world_size,
+#     #     rank=args.rank,
+#     # )
+#     torch.distributed.init_process_group(
+#         backend="nccl",
+#         init_method=args.dist_url,
+#         # world_size=args.world_size,
+#         # rank=args.rank,
+#     )
+
+#     torch.cuda.set_device(args.gpu)
+#     print('| distributed init (rank {}): {}'.format(
+#         args.rank, args.dist_url), flush=True)
+#     dist.barrier()
+#     setup_for_distributed(args.rank == 0)
+
 def init_distributed_mode(args):
-    # launched with torch.distributed.launch
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
         args.rank = int(os.environ["RANK"])
         args.world_size = int(os.environ['WORLD_SIZE'])
         args.gpu = int(os.environ['LOCAL_RANK'])
-    # launched with submitit on a slurm cluster
     elif 'SLURM_PROCID' in os.environ:
         args.rank = int(os.environ['SLURM_PROCID'])
         args.gpu = args.rank % torch.cuda.device_count()
-    # launched naively with `python main_dino.py`
-    # we manually add MASTER_ADDR and MASTER_PORT to env variables
     elif torch.cuda.is_available():
         print('Will run the code on one GPU.')
-        args.rank, args.gpu, args.world_size = 0, 0, 1
+        args.rank, args.gpu, args.world_size = 0, 1, 1 
         os.environ['MASTER_ADDR'] = '127.0.0.1'
         os.environ['MASTER_PORT'] = '29500'
     else:
-        print('Does not support training without GPU.')
-        sys.exit(1)
+        print('Not using distributed mode')
+        args.distributed = False
+        return
 
-    # dist.init_process_group(
-    #     backend="nccl",
-    #     init_method=args.dist_url,
-    #     world_size=args.world_size,
-    #     rank=args.rank,
-    # )
-    torch.distributed.init_process_group(
-        backend="nccl",
-        init_method=args.dist_url,
-        # world_size=args.world_size,
-        # rank=args.rank,
-    )
-
+    args.distributed = True
     torch.cuda.set_device(args.gpu)
-    print('| distributed init (rank {}): {}'.format(
-        args.rank, args.dist_url), flush=True)
-    dist.barrier()
+    args.dist_backend = 'nccl'
+    print('| distributed init (rank {}): {}'.format(args.rank, args.dist_url), flush=True)
+    
+    # Set environment variables if not already set
+    if 'WORLD_SIZE' not in os.environ:
+        os.environ['WORLD_SIZE'] = str(args.world_size)
+    if 'RANK' not in os.environ:
+        os.environ['RANK'] = str(args.rank)
+    
+    torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
+                                         world_size=args.world_size, rank=args.rank)
+    torch.distributed.barrier()
     setup_for_distributed(args.rank == 0)
-
+    
+    # torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url)
+    # torch.distributed.barrier()
+    # setup_for_distributed(args.rank == 0)
+    
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""

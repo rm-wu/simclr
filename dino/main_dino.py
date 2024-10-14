@@ -33,6 +33,28 @@ from torchvision import models as torchvision_models
 import utils
 import vision_transformer as vits
 from vision_transformer import DINOHead
+import logging
+
+from tqdm import tqdm, trange 
+
+
+def setup_logger(output_dir):
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    output_dir = Path(output_dir).resolve() / datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True)
+    file_handler = logging.FileHandler(output_dir / 'dino_training.log')
+    # file_handler = logging.FileHandler(Path(output_dir) / f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}" /'dino_training.log')
+    console_handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    return logger
+
+
 
 torchvision_archs = sorted(name for name in torchvision_models.__dict__
     if name.islower() and not name.startswith("__")
@@ -129,7 +151,7 @@ def get_args_parser():
     return parser
 
 
-def train_dino(args):
+def train_dino(args, logger):
     utils.init_distributed_mode(args)
     utils.fix_random_seeds(args.seed)
     print("git:\n  {}\n".format(utils.get_sha()))
@@ -142,7 +164,10 @@ def train_dino(args):
         args.local_crops_scale,
         args.local_crops_number,
     )
-    dataset = datasets.ImageFolder(args.data_path, transform=transform)
+    # dataset = datasets.ImageFolder(args.data_path, transform=transform)
+    data_path = Path(args.data_path).resolve()
+    logger.debug(data_path)
+    dataset = datasets.ImageNet(root=str(data_path), split='train', transform=transform)
     sampler = torch.utils.data.DistributedSampler(dataset, shuffle=True)
     data_loader = torch.utils.data.DataLoader(
         dataset,
@@ -178,6 +203,7 @@ def train_dino(args):
         embed_dim = student.fc.weight.shape[1]
     else:
         print(f"Unknow architecture: {args.arch}")
+
 
     # multi-crop wrapper handles forward with inputs of different resolutions
     student = utils.MultiCropWrapper(student, DINOHead(
@@ -237,7 +263,8 @@ def train_dino(args):
     # for mixed precision training
     fp16_scaler = None
     if args.use_fp16:
-        fp16_scaler = torch.cuda.amp.GradScaler()
+        # fp16_scaler = torch.cuda.amp.GradScaler()
+        fp16_scaler = torch.amp.GradScaler('cuda', enabled=True)
 
     # ============ init schedulers ... ============
     lr_schedule = utils.cosine_scheduler(
@@ -271,7 +298,7 @@ def train_dino(args):
 
     start_time = time.time()
     print("Starting DINO training !")
-    for epoch in range(start_epoch, args.epochs):
+    for epoch in trange(start_epoch, args.epochs):
         data_loader.sampler.set_epoch(epoch)
 
         # ============ training one epoch of DINO ... ============
@@ -308,7 +335,11 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
                     fp16_scaler, args):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Epoch: [{}/{}]'.format(epoch, args.epochs)
-    for it, (images, _) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+    
+    pbar = tqdm(data_loader, ncols=100, desc="Training")
+    # pbar = tqdm(enumerate(data_loader), total=len(data_loader), 
+    #             desc=header, ncols=100, leave=False)
+    for it, (images, _) in enumerate(pbar):
         # update weight decay and learning rate according to their schedule
         it = len(data_loader) * epoch + it  # global training iteration
         for i, param_group in enumerate(optimizer.param_groups):
@@ -323,34 +354,69 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
         #     teacher_output = teacher(images[:2])  # only the 2 global views pass through the teacher
         #     student_output = student(images)
         #     loss = dino_loss(student_output, teacher_output, epoch)
-        with torch.cuda.amp.autocast(enabled=fp16_scaler is not None):
+        # with torch.cuda.amp.autocast(enabled=fp16_scaler is not None):
+        with torch.amp.autocast("cuda", enabled=fp16_scaler is not None):
             teacher_output = teacher(images[:2])  # only the 2 global views pass through the teacher
             student_output = student(images)
             loss = dino_loss(student_output, teacher_output, epoch)
         
+        pbar.set_postfix(loss=f"{loss.item():.4f}")
+        # print(loss.item())
+
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()), force=True)
             sys.exit(1)
 
         # student update
         optimizer.zero_grad()
-        param_norms = None
         if fp16_scaler is None:
             loss.backward()
             if args.clip_grad:
                 param_norms = utils.clip_gradients(student, args.clip_grad)
-            utils.cancel_gradients_last_layer(epoch, student,
-                                              args.freeze_last_layer)
+            utils.cancel_gradients_last_layer(epoch, student, args.freeze_last_layer)
             optimizer.step()
         else:
             fp16_scaler.scale(loss).backward()
             if args.clip_grad:
                 fp16_scaler.unscale_(optimizer)  # unscale the gradients of optimizer's assigned params in-place
                 param_norms = utils.clip_gradients(student, args.clip_grad)
-            utils.cancel_gradients_last_layer(epoch, student,
-                                              args.freeze_last_layer)
+            utils.cancel_gradients_last_layer(epoch, student, args.freeze_last_layer)
             fp16_scaler.step(optimizer)
             fp16_scaler.update()
+        
+        # # teacher and student forward passes + compute dino loss
+        # # with torch.cuda.amp.autocast(fp16_scaler is not None):
+        # #     teacher_output = teacher(images[:2])  # only the 2 global views pass through the teacher
+        # #     student_output = student(images)
+        # #     loss = dino_loss(student_output, teacher_output, epoch)
+        # with torch.cuda.amp.autocast(enabled=fp16_scaler is not None):
+        #     teacher_output = teacher(images[:2])  # only the 2 global views pass through the teacher
+        #     student_output = student(images)
+        #     loss = dino_loss(student_output, teacher_output, epoch)
+        
+        # if not math.isfinite(loss.item()):
+        #     print("Loss is {}, stopping training".format(loss.item()), force=True)
+        #     sys.exit(1)
+
+        # # student update
+        # optimizer.zero_grad()
+        # param_norms = None
+        # if fp16_scaler is None:
+        #     loss.backward()
+        #     if args.clip_grad:
+        #         param_norms = utils.clip_gradients(student, args.clip_grad)
+        #     utils.cancel_gradients_last_layer(epoch, student,
+        #                                       args.freeze_last_layer)
+        #     optimizer.step()
+        # else:
+        #     fp16_scaler.scale(loss).backward()
+        #     if args.clip_grad:
+        #         fp16_scaler.unscale_(optimizer)  # unscale the gradients of optimizer's assigned params in-place
+        #         param_norms = utils.clip_gradients(student, args.clip_grad)
+        #     utils.cancel_gradients_last_layer(epoch, student,
+        #                                       args.freeze_last_layer)
+        #     fp16_scaler.step(optimizer)
+        #     fp16_scaler.update()
 
         # EMA update for the teacher
         with torch.no_grad():
@@ -476,5 +542,10 @@ class DataAugmentationDINO(object):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('DINO', parents=[get_args_parser()])
     args = parser.parse_args()
+    
+    logger = setup_logger(args.output_dir)
+    
+    logger.info(f"Arguments: {args}")
+    
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-    train_dino(args)
+    train_dino(args, logger)

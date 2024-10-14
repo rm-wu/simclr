@@ -1,0 +1,28 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "main_dino",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/mereur1/projects/ocl/ssl_nat_aug/dino/main_dino.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--data_path",
+                "/home/mereur1/projects/ocl/ssl_nat_aug/dino/data/imagenet",
+                "--output_dir",
+                "/home/mereur1/projects/ocl/ssl_nat_aug/dino/outputs/",
+                "--arch",
+                "vit_small",
+                "--epochs",
+                "100",
+                "--batch_size_per_gpu",
+                "256"
+            ]
+        }
+    ]
+}
