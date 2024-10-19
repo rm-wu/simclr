@@ -129,7 +129,7 @@ def compute_masks_per_single_object(video, mean_thr=0.1, min_thr=0.025):
     masks_per_object = []
     for color in unique_colors:
         masks = torch.stack([(m == color).all(dim=-1) for m in seg_maps]) # num_frames, width, height
-        if masks.float().mean()>mean_thr and masks.sum([1,2]).min()>min_thr:
+        if masks.float().mean()>mean_thr and masks.float().mean([1,2]).min()>min_thr:
             masks_per_object.append(masks)
     if len(masks_per_object)>0:
         video.masks_per_object = torch.stack(masks_per_object) # num_good_masks,N,W,H
