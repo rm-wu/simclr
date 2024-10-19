@@ -210,6 +210,7 @@ for i,video_name in enumerate(VIDEO_NAMES):
                 compute_cos_sims_per_objects(video, vits8)
                 visualize_traj(video)
                 print(video.S.mean())
+                torch.save(video, f'videos/{video.name}.pt')
                 del video
             except:
                 print(f'Skipping {video.name} as no good segmentation maps found')
