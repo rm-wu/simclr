@@ -201,14 +201,14 @@ for i,video_name in enumerate(VIDEO_NAMES):
     if i%10==0:
         print(f'{i}/{len(VIDEO_NAMES)}')
     print(video_name)
-    if video_name.endswith('.mp4') and video_name[:-4] not in ' '.join(os.listdir('figs')):
+    if video_name.endswith('.mp4'): # and video_name[:-4] not in ' '.join(os.listdir('figs')):
         frames_, seg_maps_ = build_video(video_name[:-4])
         if frames_ is not None:
             video = Video(video_name[:-4], frames_, seg_maps_, transform)
             try:
                 compute_masks_per_single_object(video) # num_good_masks,N,224,224,3
                 compute_cos_sims_per_objects(video, vits8)
-                # visualize_traj(video)
+                visualize_traj(video)
                 print(video.S.mean())
                 torch.save([video.frames, video.seg_maps, video.masks_per_object, video.S], f'videos/{video.name}.pt')
                 del video
