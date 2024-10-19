@@ -8,3 +8,4 @@ wandb/
 scratch/
 PetFace
 data_tars
+.DS_Store
