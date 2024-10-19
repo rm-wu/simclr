@@ -11,3 +11,4 @@ data_tars
 .DS_Store
 figs/
 *.tar.gz
+*.tar
