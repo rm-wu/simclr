@@ -208,7 +208,7 @@ for i,video_name in enumerate(VIDEO_NAMES):
             try:
                 compute_masks_per_single_object(video) # num_good_masks,N,224,224,3
                 compute_cos_sims_per_objects(video, vits8)
-                visualize_traj(video)
+                # visualize_traj(video)
                 print(video.S.mean())
                 torch.save([video.frames, video.seg_maps, video.masks_per_object, video.S], f'videos/{video.name}.pt')
                 del video
