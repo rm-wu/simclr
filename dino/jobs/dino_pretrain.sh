@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=dino_pretrain      # Job name
-#SBATCH --output=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/logs/test_ddp.o%j # Name of stdout output file
-#SBATCH --error=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/logs/test_ddp.e%j  # Name of stderr error file
+#SBATCH --output=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/logs/dino_pretrain.o%j # Name of stdout output file
+#SBATCH --error=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/logs/dino_pretrain.e%j  # Name of stderr error file
 #SBATCH --partition=standard-g   # partition name
 #SBATCH --time=0-01:00:00        # Run time (d-hh:mm:ss)
 #SBATCH --account=project_462000585  # Project for billing
@@ -51,15 +51,14 @@ srun python3 -m torch.distributed.run --nproc_per_node=8 --nnodes=2 --rdzv_id $R
     --lr=0.0005 \
     --warmup_epochs=10 \
     --min_lr=1e-05 \
-    --global_crops_scale=[0.25,1.0] \
-    --local_crops_scale=[0.05,0.25] \
+    --global_crops_scale 0.25 1.0 \
+    --local_crops_scale 0.05 0.25 \
     --local_crops_number=10 \
     --seed=0 \
     --num_workers=10 \
-    --world_size=16 \
-    --ngpus=8 \
-    --nodes=2 \
     --optimizer=adamw \
     --momentum_teacher=0.996 \
     --use_bn_in_head=false \
-    --drop_path_rate=0.1
+    --drop_path_rate=0.1 \
+    --data_path=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/data/imagenet/ \
+    --output_dir=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/outputs/

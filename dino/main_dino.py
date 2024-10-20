@@ -66,8 +66,8 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--arch', default='vit_small', type=str,
-        choices=['vit_tiny', 'vit_small', 'vit_base', 'xcit', 'deit_tiny', 'deit_small'] \
-                + torchvision_archs + torch.hub.list("facebookresearch/xcit:main"),
+        choices=['vit_tiny', 'vit_small', 'vit_base', 'xcit', 'deit_tiny', 'deit_small'], #\
+                # + torchvision_archs + torch.hub.list("facebookresearch/xcit:main"),
         help="""Name of architecture to train. For quick experiments with ViTs,
         we recommend using vit_tiny or vit_small.""")
     parser.add_argument('--patch_size', default=16, type=int, help="""Size in pixels
@@ -369,11 +369,11 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
             loss = dino_loss(student_output, teacher_output, epoch)
         
         pbar.set_postfix(loss=f"{loss.item():.4f}")
-        if utils.is_main_process():
-            if args.use_wandb:
-                wandb.log({"train/loss": loss.item(),
-                           "train/lr": optimizer.param_groups[0]["lr"],
-                           "train/wd": optimizer.param_groups[0]["weight_decay"]})
+        # if utils.is_main_process():
+        #     if args.use_wandb:
+        #         wandb.log({"train/loss": loss.item(),
+        #                    "train/lr": optimizer.param_groups[0]["lr"],
+        #                    "train/wd": optimizer.param_groups[0]["weight_decay"]})
         # print(loss.item())
 
         if not math.isfinite(loss.item()):
@@ -563,13 +563,13 @@ if __name__ == '__main__':
     
     
     # if args.local_rank == 0:  # only on main process
-    if utils.is_main_process():
-        # Initialize wandb run
-        if args.use_wandb:
-            print(f"{utils.is_main_process()} {utils.get_rank()}")
-            run = wandb.init(
-                entity=args.entity,
-                project=args.project,
-                name=args.name,
-            )    
+    # if utils.is_main_process():
+    #     # Initialize wandb run
+    #     if args.use_wandb:
+    #         print(f"{utils.is_main_process()} {utils.get_rank()}")
+    #         run = wandb.init(
+    #             entity=args.entity,
+    #             project=args.project,
+    #             name=args.name,
+    #         )    
     train_dino(args, logger)
