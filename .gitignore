@@ -12,3 +12,5 @@ data_tars
 figs/
 *.tar.gz
 *.tar
+old/
+videos/

@@ -123,14 +123,17 @@ def get_unique_colors(seg_maps):
     unique_colors = unique_colors.unique(dim=0)
     return unique_colors
 
-def compute_masks_per_single_object(video, mean_thr=0.1, min_thr=0.025):
+def compute_masks_per_single_object(video, mean_thr=0.05, min_thr=0.02):
     seg_maps = video.seg_maps
-    unique_colors = get_unique_colors(seg_maps)    
+    unique_colors = get_unique_colors(seg_maps)
     masks_per_object = []
     for color in unique_colors:
         masks = torch.stack([(m == color).all(dim=-1) for m in seg_maps]) # num_frames, width, height
-        if masks.float().mean()>mean_thr and masks.float().mean([1,2]).min()>min_thr:
-            masks_per_object.append(masks)
+        means_across_frames = masks.float().mean(-1).mean(-1)
+        fraction_of_frames_wo_object = (means_across_frames<min_thr).float().mean()
+        if means_across_frames.mean()>mean_thr: # if object is large enough
+            if fraction_of_frames_wo_object<0.25: # if object is present in at least 75% of the frames
+                masks_per_object.append(masks)
     if len(masks_per_object)>0:
         video.masks_per_object = torch.stack(masks_per_object) # num_good_masks,N,W,H
     else:
@@ -161,11 +164,11 @@ def visualize_traj(video, Nmax=5, imagenet_reverse_transform=None):
     frames,transformed_seg_imgs,S,S_idx = video.frames, video.transformed_seg_imgs, video.S, video.S_idx
     if S is None:
         print(f'No similarity matrix computed, skipping video {video.name}')
-        return
     if imagenet_reverse_transform is None:
         imagenet_reverse_transform = T.Normalize(mean=(-0.485/0.229, -0.456/0.224, -0.406/0.225), std=(1/0.229, 1/0.224, 1/0.225))
-    N_, T_ = transformed_seg_imgs.shape[:2]
-    T_ = S.shape[1]
+    N_,video_len = transformed_seg_imgs.shape[:2]
+    T_ = 20 if S is None else S.shape[1] 
+    S_idx = range(0,(video_len//20)*20,video_len//20) if S_idx is None else S_idx
     N_ = min(N_,Nmax)
     fig,ax = plt.subplots(N_+1, T_+1, figsize=(3*(T_+1),3*(N_+1)))
     # plot the video first
@@ -178,18 +181,17 @@ def visualize_traj(video, Nmax=5, imagenet_reverse_transform=None):
             ax[i,j].imshow(apply_transform(transformed_seg_imgs[i-1,S_idx[j]],imagenet_reverse_transform).cpu())
             # ax[i,j].imshow(imagenet_reverse_transform(transformed_seg_imgs[i-1,j*every].permute(2,0,1)).permute(1,2,0))
             ax[i,j].axis('off')
-        img_ = ax[i,-1].imshow(video.S[i-1].cpu())
-        fig.colorbar(img_, ax=ax[i,-1])
-        ax[i,-1].axis('off')
-        ax[i,-1].axis('off')
+        if S is not None:
+            img_ = ax[i,-1].imshow(video.S[i-1].cpu())
+            fig.colorbar(img_, ax=ax[i,-1])
+            ax[i,-1].axis('off')
+            ax[i,-1].axis('off')
     plt.tight_layout()
     plt.savefig(f'figs/{video.name}.png',dpi=200)
-
 
 ROOT = get_root_folder()
 VIDEO_NAMES = os.listdir(os.path.join(ROOT, 'videos'))
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-# channel-first input
 # transform = T.Compose([T.Resize(224),T.CenterCrop(224),T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
 transform = T.Compose([T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
 imagenet_reverse_transoform = T.Normalize(mean=(-0.485/0.229, -0.456/0.224, -0.406/0.225), std=(1/0.229, 1/0.224, 1/0.225))
@@ -201,7 +203,7 @@ for i,video_name in enumerate(VIDEO_NAMES):
     if i%10==0:
         print(f'{i}/{len(VIDEO_NAMES)}')
     print(video_name)
-    if video_name.endswith('.mp4'): # and video_name[:-4] not in ' '.join(os.listdir('figs')):
+    if video_name.endswith('.mp4') and video_name[:-4] not in ' '.join(os.listdir('videos')):
         frames_, seg_maps_ = build_video(video_name[:-4])
         if frames_ is not None:
             video = Video(video_name[:-4], frames_, seg_maps_, transform)
@@ -217,4 +219,4 @@ for i,video_name in enumerate(VIDEO_NAMES):
                 continue
         else:
             print(f'Skipping {video_name} as no good segmentation maps found')
-    print_gpu_memory()
+    # print_gpu_memory()
