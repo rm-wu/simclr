@@ -21,7 +21,7 @@ class Video:
     @property
     def S(self):
         ''' cos sim of the same obj across diff frames.  of shape [num_good_masks,N_,N_] where N_ is a user input'''
-        return (self.embeddings.unsqueeze(0) * self.embeddings.unsqueeze(1)).sum(-1)
+        return (self.embeddings.unsqueeze(1) * self.embeddings.unsqueeze(2)).sum(-1)
     @property
     def transformed_seg_imgs(self):
         if self.masks_per_object is None:
