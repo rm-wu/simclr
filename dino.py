@@ -13,11 +13,15 @@ class Video:
         self.frames = frames # num_frames, width, height, channels, int between [0,255]
         self.seg_maps = seg_maps # num_frames, width, height, channels
         self.masks_per_object = None # will be of shape [num_good_masks,W,H]
-        self.S = None # cos sim of the same obj across diff frames.  of shape [num_good_masks,N_,N_] where N_ is a user input
+        self.embeddings = None # embeddings of shape [num_good_masks,N_,q] where N_ is a user input
         self.transform = transform
     @property
     def Nf(self):
         return len(self.frames)
+    @property
+    def S(self):
+        ''' cos sim of the same obj across diff frames.  of shape [num_good_masks,N_,N_] where N_ is a user input'''
+        return (self.embeddings.unsqueeze(0) * self.embeddings.unsqueeze(1)).sum(-1)
     @property
     def transformed_seg_imgs(self):
         if self.masks_per_object is None:
@@ -152,12 +156,11 @@ def compute_embeddings(frames, network, normalize=True):
 def compute_cos_sims_per_objects(video, network, N_=20):
     Nf = video.Nf
     video.S_idx = range(0,(Nf//N_)*N_, (Nf//N_))
-    S = []
+    embeddings = []
     for seg in video.transformed_seg_imgs:
-        embeddings = compute_embeddings(seg[video.S_idx], network)
-        S_ = (embeddings.unsqueeze(0) * embeddings.unsqueeze(1)).sum(-1)
-        S.append(S_)
-    video.S = torch.stack(S) # num_good_masks,N_,N_
+        embeddings_ = compute_embeddings(seg[video.S_idx], network)
+        embeddings.append(embeddings_) 
+    video.embeddings = torch.stack(embeddings) # num_good_masks,N_,N_
 
 def visualize_traj(video, Nmax=5, imagenet_reverse_transform=None):
     ''' video - [T,W,H,C] '''
@@ -212,7 +215,7 @@ for i,video_name in enumerate(VIDEO_NAMES):
                 compute_cos_sims_per_objects(video, vits8)
                 visualize_traj(video)
                 print(video.S.mean())
-                torch.save([video.frames, video.seg_maps, video.masks_per_object, video.S], f'videos/{video.name}.pt')
+                torch.save([video.frames, video.seg_maps, video.masks_per_object, video.embeddings], f'videos/{video.name}.pt')
                 del video
             except:
                 print(f'Skipping {video.name} as no good segmentation maps found')
