@@ -137,7 +137,7 @@ x = x.unsqueeze(dim=0)
 x = torch.einsum('nhwc->nchw', x)
 
 # run MAE
-loss, y, mask = model(x.float(), mask_ratio=0.75)
+loss, y, mask, latent = model(x.float(), mask_ratio=0.0, return_latent=True)
 y = model.unpatchify(y)
 y = torch.einsum('nchw->nhwc', y).detach().cpu()
 

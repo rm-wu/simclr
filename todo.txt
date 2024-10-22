@@ -1,0 +1,14 @@
+- Add DINO, PMSN, VICReg and corresponding transforms
+    - Check for reference 
+    https://github.com/lightly-ai/lightly/tree/master/benchmarks/imagenet/resnet50
+
+- Improve the logging part
+- Refactor everything into a package
+- Change name of the repo?
+    - ssl_nat_aug
+
+
+
+- Check evaluation scripts from Cagatay
+    - Is there any way of using some code from the original PetFace repo?
+    - What is the current code doing? How to improve it?
