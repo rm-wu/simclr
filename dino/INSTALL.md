@@ -6,3 +6,5 @@ To install the environment, run:
 conda env create -f environment.yaml
 ```
 
+
+Note: use `mamba env create -f environment.yaml` instead of `conda env create -f environment.yaml` to install the environment faster.
