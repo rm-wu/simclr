@@ -21,6 +21,8 @@ class Video:
     @property
     def S(self):
         ''' cos sim of the same obj across diff frames.  of shape [num_good_masks,N_,N_] where N_ is a user input'''
+        if self.embeddings is None:
+            return None
         return (self.embeddings.unsqueeze(1) * self.embeddings.unsqueeze(2)).sum(-1)
     @property
     def transformed_seg_imgs(self):
@@ -59,7 +61,7 @@ def print_gpu_memory():
 
 def get_root_folder():
     if 'cagatay' in os.getcwd():
-        return '/Users/cagatay/Downloads/VidOR'
+        return 'data/VidOR'
     else:
         if os.path.exists('/weka'):
             return '/home/bethge/cyildiz40/data/VidOR'
