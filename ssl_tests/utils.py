@@ -88,19 +88,16 @@ def plot_feats(
     # fine_feats_map = viz_feat(fine_feats)
 
     if ori_labels is not None:
-        fig, ax = plt.subplots(2, 2, figsize=(10, 5))
-        ax[0][0].imshow(image)
-        ax[0][0].set_title("Input image", fontsize=15)
-        ax[0][1].imshow(ori_feats_map)
-        ax[0][1].set_title("Original " + model_option, fontsize=15)
-        ax[1][1].imshow(ori_labels)
-        for xx in ax:
-            for x in xx:
-                x.xaxis.set_major_formatter(plt.NullFormatter())
-                x.yaxis.set_major_formatter(plt.NullFormatter())
-                x.set_xticks([])
-                x.set_yticks([])
-                x.axis("off")
+        fig, ax = plt.subplots(2, 1, figsize=(5, 10))
+        ax[0].imshow(ori_feats_map)
+        ax[0].set_title("Original " + model_option, fontsize=15)
+        ax[1].imshow(ori_labels)
+        for x in ax:
+            x.xaxis.set_major_formatter(plt.NullFormatter())
+            x.yaxis.set_major_formatter(plt.NullFormatter())
+            x.set_xticks([])
+            x.set_yticks([])
+            x.axis("off")
 
     else:
         fig, ax = plt.subplots(1, 2, figsize=(10, 10))

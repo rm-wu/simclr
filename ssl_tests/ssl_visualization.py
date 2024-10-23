@@ -98,5 +98,5 @@ for model_option in options:
     else:
         ori_labels = None
         
-    plot_feats(image, "MAE", ori_feats, None, ori_labels, None, args.output_dir, 0)
+    plot_feats(image, model_option, ori_feats, None, ori_labels, None, args.output_dir, 0)
 # %%
