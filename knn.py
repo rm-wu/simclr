@@ -100,28 +100,30 @@ def get_frame(anchor_idx):
     del video
     return apply_transform(frame,imagenet_reverse_transform).cpu(), video_id_anchor, seg_map_id_anchor, frame_id_anchor
 
-fig,ax = plt.subplots(6,10,figsize=(30,18),squeeze=False)
-for i in range(0,500):
-    anchor_idx = misclassified_idx[i]
-    anchor_frame, video_id, seg_map_id, frame_id = get_frame(anchor_idx)
-    if video_id==194 and seg_map_id==6 and frame_id==2:
+for j in range(50):
+    if f'{j}.png' in os.listdir('errors'):
         continue
-    ax[0,i%10].imshow(anchor_frame);
-    ax[0,i%10].set_title(f'Anchor (video {video_id}, seg_map {seg_map_id}, frame {frame_id*20})');
-    ax[0,i%10].axis('off');
-    for j in range(5):
-        nn_frame, video_id, seg_map_id, frame_id = get_frame(nearest_neighbors[anchor_idx,j].item())
+    fig,ax = plt.subplots(6,10,figsize=(30,18),squeeze=False)
+    for i in range(j*10,(j+1)*10):
+        anchor_idx = misclassified_idx[i]
+        anchor_frame, video_id, seg_map_id, frame_id = get_frame(anchor_idx)
         if video_id==194 and seg_map_id==6 and frame_id==2:
             continue
-        ax[j+1,i%10].imshow(nn_frame);
-        ax[j+1,i%10].set_title(f'NN (video {video_id}, seg_map {seg_map_id}, frame {frame_id*20})');
-        ax[j+1,i%10].axis('off');
-    if i%10==9:
-        plt.tight_layout()
-        plt.show()
-        plt.savefig(f'errors/{i}.png',dpi=200)
-        plt.close()
-        fig,ax = plt.subplots(6,10,figsize=(60,36),squeeze=False)   
+        ax[0,i%10].imshow(anchor_frame);
+        ax[0,i%10].set_title(f'Anchor (video {video_id}, seg_map {seg_map_id}, frame {frame_id*20})');
+        ax[0,i%10].axis('off');
+        for j in range(5):
+            nn_frame, video_id, seg_map_id, frame_id = get_frame(nearest_neighbors[anchor_idx,j].item())
+            if video_id==194 and seg_map_id==6 and frame_id==2:
+                continue
+            ax[j+1,i%10].imshow(nn_frame);
+            ax[j+1,i%10].set_title(f'NN (video {video_id}, seg_map {seg_map_id}, frame {frame_id*20})');
+            ax[j+1,i%10].axis('off');
+    plt.tight_layout()
+    plt.show()
+    plt.savefig(f'errors/{i}.png',dpi=200)
+    plt.close()
+    fig,ax = plt.subplots(6,10,figsize=(60,36),squeeze=False)   
 
 plt.close()
 
