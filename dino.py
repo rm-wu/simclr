@@ -28,8 +28,8 @@ for i,video_name in enumerate(VIDEO_NAMES):
     if i%10==0:
         print(f'{i}/{len(VIDEO_NAMES)}')
     print(video_name)
-    if video_name.endswith('.mp4') and video_name[:-4] not in ' '.join(os.listdir('videos')):
-        frames_, seg_maps_ = build_video(video_name[:-4])
+    if video_name.endswith('.mp4')  and video_name[:-4] not in ' '.join(os.listdir('videos')):
+        frames_, seg_maps_ = build_video(ROOT, video_name[:-4], device)
         if frames_ is not None:
             video = Video(video_name[:-4], frames_, seg_maps_, transform)
             try:
