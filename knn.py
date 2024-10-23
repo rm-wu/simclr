@@ -21,36 +21,37 @@ device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('
 transform = T.Compose([T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
 imagenet_reverse_transform = T.Normalize(mean=(-0.485/0.229, -0.456/0.224, -0.406/0.225), std=(1/0.229, 1/0.224, 1/0.225))
 
-
 # read the embeddings
-saved_videos = os.listdir('videos/')
-all_embeddings = []
-all_labels     = []
-num_objects    = []
-loaded_videos  = []
-last_label     = -1
-for i,video in enumerate(saved_videos):
-    print(i,len(saved_videos))
-    if i==185:
-        continue
-    try:
-        frames, seg_maps, masks_per_object, embeddings = torch.load(f'videos/{video}',map_location=device) # embeddings: [num_good_masks,N_,q]
-        class_labels = (last_label+1+torch.arange(embeddings.shape[0])).unsqueeze(0).repeat(embeddings.shape[1],1).T.flatten()
-        reshaped_embeddings = embeddings.reshape(-1,embeddings.shape[-1])
-        all_embeddings.append(reshaped_embeddings) # num_good_masks*N_,q
-        all_labels.append(class_labels) # num_good_masks*N_
-        last_label += embeddings.shape[0]
-        num_objects.append(embeddings.shape[0])
-        loaded_videos.append(video)
-    except Exception as e:
-        print(video, e)
-        continue
+# saved_videos = os.listdir('videos/')
+# all_embeddings = []
+# all_labels     = []
+# num_objects    = []
+# loaded_videos  = []
+# last_label     = -1
+# for i,video in enumerate(saved_videos):
+#     print(i,len(saved_videos))
+#     if i==185:
+#         continue
+#     try:
+#         frames, seg_maps, masks_per_object, embeddings = torch.load(f'videos/{video}',map_location=device) # embeddings: [num_good_masks,N_,q]
+#         class_labels = (last_label+1+torch.arange(embeddings.shape[0])).unsqueeze(0).repeat(embeddings.shape[1],1).T.flatten()
+#         reshaped_embeddings = embeddings.reshape(-1,embeddings.shape[-1])
+#         all_embeddings.append(reshaped_embeddings) # num_good_masks*N_,q
+#         all_labels.append(class_labels) # num_good_masks*N_
+#         last_label += embeddings.shape[0]
+#         num_objects.append(embeddings.shape[0])
+#         loaded_videos.append(video)
+#     except Exception as e:
+#         print(video, e)
+#         continue
 
-all_labels = torch.cat(all_labels)
-all_embeddings = torch.cat(all_embeddings)
-num_objects = torch.tensor(num_objects)
-print(all_labels.shape, all_embeddings.shape, num_objects.shape, num_objects.sum())
-torch.save([all_labels, all_embeddings, num_objects, loaded_videos], 'videos_embeddings.pt')
+# all_labels = torch.cat(all_labels)
+# all_embeddings = torch.cat(all_embeddings)
+# num_objects = torch.tensor(num_objects)
+# print(all_labels.shape, all_embeddings.shape, num_objects.shape, num_objects.sum())
+# torch.save([all_labels, all_embeddings, num_objects, loaded_videos], 'videos_embeddings.pt')
+
+all_labels, all_embeddings, num_objects, loaded_videos = torch.load('videos_embeddings.pt')
 
 # compute nearest neighbors
 similarity = torch.zeros(all_embeddings.shape[0],all_embeddings.shape[0])
