@@ -4,8 +4,46 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
-
+        {
+            "name": "mae visualize attention",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "mae/mae_visualization_2.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--image_path",
+                "/home/mereur1/projects/ocl/ssl_nat_aug/dino/images/1.png",
+                "--arch",
+                "mae_vit_large_patch16",
+                "--patch_size",
+                "16"
+            ]
+        },
+        {
+            "name": "dino visualize attention",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "dino/visualize_attention.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--image_path",
+                "/home/mereur1/projects/ocl/ssl_nat_aug/dino/images/1.png",
+                "--arch",
+                "vit_small",
+                "--patch_size",
+                "16"
+            ]
+        },
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
         {
             "name": "train.py",
             "type": "debugpy",

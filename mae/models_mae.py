@@ -14,7 +14,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 
-from timm.models.vision_transformer import PatchEmbed, Block
+from timm.models.vision_transformer import PatchEmbed, Block, Attention
 
 from util.pos_embed import get_2d_sincos_pos_embed
 
@@ -27,6 +27,7 @@ class MaskedAutoencoderViT(nn.Module):
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False):
         super().__init__()
+        self.num_heads = num_heads
 
         # --------------------------------------------------------------------------
         # MAE encoder specifics
@@ -35,7 +36,16 @@ class MaskedAutoencoderViT(nn.Module):
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False)  # fixed sin-cos embedding
-
+        
+        def get_attention_map(self, x):
+            B, N, C = x.shape
+            qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+            q, k, v = qkv[0], qkv[1], qkv[2]   # make torchscript happy (cannot use tensor as tuple)
+            attn = (q @ k.transpose(-2, -1)) * self.scale
+            attn = attn.softmax(dim=-1)
+            return attn
+        setattr(Attention, 'get_attention_map', get_attention_map)
+        
         self.blocks = nn.ModuleList([
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer)
             for i in range(depth)])
@@ -168,6 +178,20 @@ class MaskedAutoencoderViT(nn.Module):
         x = self.norm(x)
 
         return x, mask, ids_restore
+    
+    def get_last_selfattention(self, x):
+        # Reshape and permute the input tensor
+        x = self.patch_embed(x)
+        x = x + self.pos_embed[:, 1:, :]
+        cls_token = self.cls_token + self.pos_embed[:, :1, :]
+        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+  
+        for blk in self.blocks[:-1]:
+            x = blk(x)
+
+        # Return the attention map of the last block
+        return self.blocks[-1].attn.get_attention_map(x)
 
     def forward_decoder(self, x, ids_restore):
         # embed tokens
