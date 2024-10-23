@@ -10,7 +10,11 @@ PetFace
 data_tars
 .DS_Store
 figs/
+errors/
 *.tar.gz
 *.tar
 old/
 videos/
+*.pt
+*.pth
+*.zip
