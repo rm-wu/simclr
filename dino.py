@@ -2,10 +2,46 @@
 import os, cv2, numpy as np
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
 from torchvision import transforms as T
 from PIL import Image
+
+
+def make_square_tensor(image_tensor, fill_values=(-0.485/0.229, -0.456/0.224, -0.406/0.225)):
+    """
+    Takes a non-square tensor image of shape [w, h, c] and returns a square tensor with the image centered.
+
+    Parameters:
+        image_tensor (torch.Tensor): Input tensor image of shape [w, h, c].
+        fill_value (int): The value to fill the padding with (default is 0, i.e., black).
+
+    Returns:
+        torch.Tensor: A square tensor image with the original image centered.
+    """
+    # Get original dimensions
+    original_height, original_width, channels = image_tensor.shape
+    # Calculate the size of the square
+    max_dim = max(14,max(original_width, original_height))
+    # Calculate padding for each side
+    pad_left = (max_dim - original_width) // 2
+    pad_right = max_dim - original_width - pad_left
+    pad_top = (max_dim - original_height) // 2
+    pad_bottom = max_dim - original_height - pad_top
+    # Pad the image using F.pad
+    padded_channels = []
+    for channel in range(channels):
+        channel_tensor = image_tensor[:, :, channel]
+        padded_channel = F.pad(channel_tensor, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=fill_values[channel])
+        padded_channels.append(padded_channel)
+    padded_image = torch.stack(padded_channels, dim=0)
+    # padding = (pad_left, pad_right, pad_top, pad_bottom)  # (left, right, top, bottom)
+    # padded_image = F.pad(image_tensor.permute(2, 0, 1), padding, mode='constant', value=fill_value)
+    # Permute back to [w, h, c] format
+    padded_image = padded_image.permute(1, 2, 0)
+    return padded_image
+
 
 class Video:
     def __init__(self, name, frames, seg_maps, transform):
@@ -44,10 +80,19 @@ class Video:
             for mask,frame in zip(masks,objects):
                 nonzero_rows = torch.where(mask.sum(1).abs()>1e-5)[0]
                 nonzero_cols = torch.where(mask.sum(0).abs()>1e-5)[0]
-                up,down = nonzero_rows.min(),nonzero_rows.max()
-                left,right = nonzero_cols.min(),nonzero_cols.max()
-                transformed_seg_cropped_imgs_.append(frame[up:down,left:right])
-            print([f.shape for f in transformed_seg_cropped_imgs_])
+                try:
+                    up,down = nonzero_rows.min(),nonzero_rows.max()
+                    assert down-up>14
+                except:
+                    up,down = 0,14
+                try:
+                    left,right = nonzero_cols.min(),nonzero_cols.max()
+                    assert right-left>14
+                except:
+                    left,right = 0,14
+                cropped_image = frame[up:down,left:right]
+                cropped_image = make_square_tensor(cropped_image)
+                transformed_seg_cropped_imgs_.append(cropped_image)
             transformed_seg_cropped_imgs.append(transformed_seg_cropped_imgs_)
         return transformed_seg_cropped_imgs
 
@@ -166,6 +211,7 @@ def compute_embeddings(frames, network, normalize=True):
         if frames[0].shape[-3] != 3:
             frames = [frame.permute(2,0,1) for frame in frames]
         with torch.no_grad():
+            # print([f.size() for f in frames])
             embeddings = [network(frame.unsqueeze(0)) for frame in frames]
         embeddings = torch.cat(embeddings)
     else:
@@ -200,8 +246,6 @@ def visualize_traj(video, Nmax=5, imagenet_reverse_transform=None):
     S_idx = range(0,(video_len//20)*20,video_len//20) if S_idx is None else S_idx
     N_ = min(N_,Nmax)
     fig,ax = plt.subplots(N_+1, T_+1, figsize=(3*(T_+1),3*(N_+1)))
-    print([f.shape for f in video.transformed_seg_cropped_imgs[0]])
-    print([f.shape for f in video.transformed_seg_cropped_imgs[1]])
     # plot the video first
     for j in range(T_):
         ax[0,j].imshow(frames[S_idx[j]].cpu())
@@ -238,10 +282,10 @@ for i,video_name in enumerate(VIDEO_NAMES):
         frames_, seg_maps_ = build_video(video_name[:-4])
         if frames_ is not None:
             video = Video(video_name[:-4], frames_, seg_maps_, transform)
-            compute_masks_per_single_object(video) # num_good_masks,N,224,224,3
-            compute_cos_sims_per_objects(video, vits8)
-            visualize_traj(video)
             try:
+                compute_masks_per_single_object(video) # num_good_masks,N,224,224,3
+                compute_cos_sims_per_objects(video, vits8)
+                visualize_traj(video)
                 print(video.S.mean())
                 torch.save([video.frames, video.seg_maps, video.masks_per_object, video.embeddings], f'videos/{video.name}.pt')
                 del video
