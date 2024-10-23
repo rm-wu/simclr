@@ -112,13 +112,13 @@ for j in range(50):
         ax[0,i%10].imshow(anchor_frame);
         ax[0,i%10].set_title(f'Anchor (video {video_id}, map {seg_map_id}, fr. {frame_id*20})');
         ax[0,i%10].axis('off');
-        for j in range(5):
-            nn_frame, video_id, seg_map_id, frame_id = get_frame(nearest_neighbors[anchor_idx,j].item())
+        for k in range(5):
+            nn_frame, video_id, seg_map_id, frame_id = get_frame(nearest_neighbors[anchor_idx,k].item())
             if video_id==194 and seg_map_id==6 and frame_id==2:
                 continue
-            ax[j+1,i%10].imshow(nn_frame);
-            ax[j+1,i%10].set_title(f'NN (video {video_id}, map {seg_map_id}, fr. {frame_id*20})');
-            ax[j+1,i%10].axis('off');
+            ax[k+1,i%10].imshow(nn_frame);
+            ax[k+1,i%10].set_title(f'NN (video {video_id}, map {seg_map_id}, fr. {frame_id*20})');
+            ax[k+1,i%10].axis('off');
     plt.tight_layout()
     plt.show()
     plt.savefig(f'errors/{j}.png',dpi=200)
