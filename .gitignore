@@ -10,4 +10,4 @@ PetFace
 data_tars
 **/ILSVRC2012_img_train.tar
 img.png
-mae_attention_vis/
+**/mae_attention_vis/
