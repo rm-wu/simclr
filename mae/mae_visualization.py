@@ -1,3 +1,4 @@
+# %%
 import os
 import sys
 import argparse
@@ -87,18 +88,15 @@ def viz_feat(feat):
 def plot_feats(image, model_option, ori_feats, fine_feats, ori_labels=None, fine_labels=None, output_dir=None, n_head=None):
 
     ori_feats_map = viz_feat(ori_feats)
-    fine_feats_map = viz_feat(fine_feats)
+    # fine_feats_map = viz_feat(fine_feats)
 
     if ori_labels is not None:
-        fig, ax = plt.subplots(2, 3, figsize=(10, 5))
+        fig, ax = plt.subplots(2, 2, figsize=(10, 5))
         ax[0][0].imshow(image)
         ax[0][0].set_title("Input image", fontsize=15)
         ax[0][1].imshow(ori_feats_map)
         ax[0][1].set_title("Original " + model_option, fontsize=15)
-        ax[0][2].imshow(fine_feats_map)
-        ax[0][2].set_title("Ours", fontsize=15)
         ax[1][1].imshow(ori_labels)
-        ax[1][2].imshow(fine_labels)
         for xx in ax:
           for x in xx:
             x.xaxis.set_major_formatter(plt.NullFormatter())
@@ -108,13 +106,11 @@ def plot_feats(image, model_option, ori_feats, fine_feats, ori_labels=None, fine
             x.axis('off')
 
     else:
-        fig, ax = plt.subplots(1, 3, figsize=(10, 10))
+        fig, ax = plt.subplots(1, 2, figsize=(10, 10))
         ax[0].imshow(image)
         ax[0].set_title("Input image", fontsize=15)
         ax[1].imshow(ori_feats_map)
         ax[1].set_title("Original " + model_option, fontsize=15)
-        ax[2].imshow(fine_feats_map)
-        ax[2].set_title("Ours", fontsize=15)
 
         for x in ax:
           x.xaxis.set_major_formatter(plt.NullFormatter())
@@ -205,7 +201,7 @@ def run_demo(model_option, image_path, kmeans=20):
         fine_labels = None
 
 
-    return plot_feats(image, model_option, ori_feats, fine_feats, ori_labels, fine_labels)
+    return plot_feats(image, model_option, ori_feats, fine_feats, ori_labels, fine_labels, output_dir, 0)
 
 # def prepare_model(chkpt_dir, arch='mae_vit_large_patch16'):
 #     # build model
@@ -276,11 +272,13 @@ def get_args_parser():
     parser = argparse.ArgumentParser('MAE Attention Visualization', add_help=False)
     parser.add_argument('--arch', default='mae_vit_large_patch16', type=str, help='Architecture')
     parser.add_argument('--patch_size', default=16, type=int, help='Patch resolution of the model.')
-    parser.add_argument('--pretrained_weights', default='mae/mae_visualize_vit_large.pth', type=str, help="Path to pretrained weights to load.")
+    # parser.add_argument('--pretrained_weights', default='mae/mae_visualize_vit_large.pth', type=str, help="Path to pretrained weights to load.")
+    parser.add_argument("--pretrained_weights", default=None, type=str, help="Path to pretrained weights to load.")
     parser.add_argument("--image_path", default=None, type=str, help="Path of the image to load.")
     parser.add_argument("--image_size", default=(224, 224), type=int, nargs="+", help="Resize image.")
     parser.add_argument('--output_dir', default='./mae_attention_vis', help='Path where to save visualizations.')
     parser.add_argument("--threshold", type=float, default=None, help="Threshold for attention map visualization.")
+    parser.add_argument("--kmeans", type=int, default=-1, help="Number of clusters for kmeans. -1 means no kmeans.")
     return parser
 
 
@@ -308,109 +306,114 @@ def main(args):
         ori_labels = None
         
     plot_feats(image, "MAE", ori_feats, None, ori_labels, None, args.output_dir, 0)
-
+    # return
     
-    # build model
-    # model = models_mae.__dict__[args.arch](patch_size=args.patch_size, num_classes=0)
-    for p in model.parameters():
-        p.requires_grad = False
-    model.eval()
-    model.to(device)
+    # # build model
+    # # model = models_mae.__dict__[args.arch](patch_size=args.patch_size, num_classes=0)
+    # for p in model.parameters():
+    #     p.requires_grad = False
+    # model.eval()
+    # model.to(device)
     
-    if os.path.isfile(args.pretrained_weights):
-        state_dict = torch.load(args.pretrained_weights, map_location="cpu")
-        if 'model' in state_dict:
-            state_dict = state_dict['model']
-        msg = model.load_state_dict(state_dict, strict=False)
-        print('Pretrained weights found at {} and loaded with msg: {}'.format(args.pretrained_weights, msg))
-    else:
-        print("Please use the `--pretrained_weights` argument to indicate the path of the checkpoint to evaluate.")
-        return
+    # # if args.pretrained_weights is not None:     
+    # #     if os.path.isfile(args.pretrained_weights):
+    # #         state_dict = torch.load(args.pretrained_weights, map_location="cpu")
+    # #     if 'model' in state_dict:
+    # #             state_dict = state_dict['model']
+    # #         msg = model.load_state_dict(state_dict, strict=False)
+    # #         print('Pretrained weights found at {} and loaded with msg: {}'.format(args.pretrained_weights, msg))
+    # #     else:
+    # #         print("Please use the `--pretrained_weights` argument to indicate the path of the checkpoint to evaluate.")
+    # #         return
 
-    # open image
-    # if args.image_path is None:
-    #     # user has not specified any image - we use our own image
-    #     print("Please use the `--image_path` argument to indicate the path of the image you wish to visualize.")
-    #     return
-    # elif os.path.isfile(args.image_path):
-    #     with open(args.image_path, 'rb') as f:
-    #         img = Image.open(f)
-    #         img = img.convert('RGB')
-    # else:
-    #     print(f"Provided image path {args.image_path} is non valid.")
-    #     return
+    # # open image
+    # # if args.image_path is None:
+    # #     # user has not specified any image - we use our own image
+    # #     print("Please use the `--image_path` argument to indicate the path of the image you wish to visualize.")
+    # #     return
+    # # elif os.path.isfile(args.image_path):
+    # #     with open(args.image_path, 'rb') as f:
+    # #         img = Image.open(f)
+    # #         img = img.convert('RGB')
+    # # else:
+    # #     print(f"Provided image path {args.image_path} is non valid.")
+    # #     return
     
-    img_path = Path(args.image_path).resolve()
-    img = Image.open(str(img_path))
-    img = img.convert("RGB")
-    img = img.resize((224, 224))
-    img = np.array(img) / 255.
+    # img_path = Path(args.image_path).resolve()
+    # img = Image.open(str(img_path))
+    # img = img.convert("RGB")
+    # img = img.resize((224, 224))
+    # img = np.array(img) / 255.
 
-    assert img.shape == (224, 224, 3)
+    # assert img.shape == (224, 224, 3)
 
-    # normalize by ImageNet mean and std
-    imagenet_mean = np.array([0.485, 0.456, 0.406])
-    imagenet_std = np.array([0.229, 0.224, 0.225])
-    img = img - imagenet_mean
-    img = img / imagenet_std
-    # img = torch.tensor(img)
-    img = pth_transforms.ToTensor()(img).unsqueeze(0).float()
+    # # normalize by ImageNet mean and std
+    # imagenet_mean = np.array([0.485, 0.456, 0.406])
+    # imagenet_std = np.array([0.229, 0.224, 0.225])
+    # img = img - imagenet_mean
+    # img = img / imagenet_std
+    # # img = torch.tensor(img)
+    # img = pth_transforms.ToTensor()(img).unsqueeze(0).float()
 
-    # # make it a batch-like
-    # x = x.unsqueeze(dim=0)
-    # x = torch.einsum('nhwc->nchw', x)
-    # transform = pth_transforms.Compose([
-    #     pth_transforms.Resize(args.image_size),
-    #     pth_transforms.ToTensor(),
-    #     pth_transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-    # ])
-    # img = transform(img)
+    # # # make it a batch-like
+    # # x = x.unsqueeze(dim=0)
+    # # x = torch.einsum('nhwc->nchw', x)
+    # # transform = pth_transforms.Compose([
+    # #     pth_transforms.Resize(args.image_size),
+    # #     pth_transforms.ToTensor(),
+    # #     pth_transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    # # ])
+    # # img = transform(img)
     
-    # make the image divisible by the patch size
+    # # make the image divisible by the patch size
 
 
-    w_featmap = img.shape[-2] // args.patch_size
-    h_featmap = img.shape[-1] // args.patch_size
-    attentions = model.get_last_selfattention(img.to(device))
+    # # w_featmap = img.shape[-2] // args.patch_size
+    # # h_featmap = img.shape[-1] // args.patch_size
+    # # attentions = model.get_last_selfattention(img.to(device))
 
-    nh = attentions.shape[1] # number of head
+    # nh = attentions.shape[1] # number of head
 
-    # we keep only the output patch attention
-    attentions = attentions[0, :, 0, 1:].reshape(nh, -1)
+    # # we keep only the output patch attention
+    # attentions = attentions[0, :, 0, 1:].reshape(nh, -1)
 
-    if args.threshold is not None:
-        # we keep only a certain percentage of the mass
-        val, idx = torch.sort(attentions)
-        val /= torch.sum(val, dim=1, keepdim=True)
-        cumval = torch.cumsum(val, dim=1)
-        th_attn = cumval > (1 - args.threshold)
-        idx2 = torch.argsort(idx)
-        for head in range(nh):
-            th_attn[head] = th_attn[head][idx2[head]]
-        th_attn = th_attn.reshape(nh, w_featmap, h_featmap).float()
-        # interpolate
-        th_attn = nn.functional.interpolate(th_attn.unsqueeze(0), scale_factor=args.patch_size, mode="nearest")[0].cpu().numpy()
+    # if args.threshold is not None:
+    #     # we keep only a certain percentage of the mass
+    #     val, idx = torch.sort(attentions)
+    #     val /= torch.sum(val, dim=1, keepdim=True)
+    #     cumval = torch.cumsum(val, dim=1)
+    #     th_attn = cumval > (1 - args.threshold)
+    #     idx2 = torch.argsort(idx)
+    #     for head in range(nh):
+    #         th_attn[head] = th_attn[head][idx2[head]]
+    #     th_attn = th_attn.reshape(nh, w_featmap, h_featmap).float()
+    #     # interpolate
+    #     th_attn = nn.functional.interpolate(th_attn.unsqueeze(0), scale_factor=args.patch_size, mode="nearest")[0].cpu().numpy()
 
-    attentions = attentions.reshape(nh, w_featmap, h_featmap)
-    attentions = nn.functional.interpolate(attentions.unsqueeze(0), scale_factor=args.patch_size, mode="nearest")[0]
-    attentions = torch.clamp(attentions, max=attentions.mean()).cpu().numpy()
+    # attentions = attentions.reshape(nh, w_featmap, h_featmap)
+    # attentions = nn.functional.interpolate(attentions.unsqueeze(0), scale_factor=args.patch_size, mode="nearest")[0]
+    # attentions = torch.clamp(attentions, max=attentions.mean()).cpu().numpy()
     
-    # save attentions heatmaps
-    os.makedirs(args.output_dir, exist_ok=True)
-    torchvision.utils.save_image(torchvision.utils.make_grid(img, normalize=True, scale_each=True), os.path.join(args.output_dir, "img.png"))
-    for j in range(nh):
-        fname = os.path.join(args.output_dir, "attn-head" + str(j) + ".png")
-        plt.imsave(fname=fname, arr=attentions[j], format='png')
-        print(f"{fname} saved.")
+    # # save attentions heatmaps
+    # os.makedirs(args.output_dir, exist_ok=True)
+    # torchvision.utils.save_image(torchvision.utils.make_grid(img, normalize=True, scale_each=True), os.path.join(args.output_dir, "img.png"))
+    # for j in range(nh):
+    #     fname = os.path.join(args.output_dir, "attn-head" + str(j) + ".png")
+    #     plt.imsave(fname=fname, arr=attentions[j], format='png')
+    #     print(f"{fname} saved.")
 
-    if args.threshold is not None:
-        image = skimage.io.imread(os.path.join(args.output_dir, "img.png"))
-        for j in range(nh):
-            display_instances(image, th_attn[j], fname=os.path.join(args.output_dir, "mask_th" + str(args.threshold) + "_head" + str(j) +".png"), blur=False)
+    # if args.threshold is not None:
+    #     image = skimage.io.imread(os.path.join(args.output_dir, "img.png"))
+    #     for j in range(nh):
+    #         display_instances(image, th_attn[j], fname=os.path.join(args.output_dir, "mask_th" + str(args.threshold) + "_head" + str(j) +".png"), blur=False)
 
+#%%
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('MAE Attention Visualization', parents=[get_args_parser()])
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser('MAE Attention Visualization', parents=[get_args_parser()])
+    # args = parser.parse_args()
+    from argparse import Namespace
+    args = Namespace(image_path="/home/mereur1/projects/ocl/ssl_nat_aug/dino/images/1.png", output_dir="mae_attention_vis", kmeans=20)
     main(args)
 
-# Copy the utility functions from DINO's visualize_attention.py
+
+# %%
