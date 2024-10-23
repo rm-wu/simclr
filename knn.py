@@ -121,12 +121,5 @@ for j in range(50):
             ax[j+1,i%10].axis('off');
     plt.tight_layout()
     plt.show()
-    plt.savefig(f'errors/{i}.png',dpi=200)
+    plt.savefig(f'errors/{j}.png',dpi=200)
     plt.close()
-    fig,ax = plt.subplots(6,10,figsize=(60,36),squeeze=False)   
-
-plt.close()
-
-
-
-
