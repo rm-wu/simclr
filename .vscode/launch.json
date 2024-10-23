@@ -8,7 +8,7 @@
             "name": "mae visualize attention",
             "type": "debugpy",
             "request": "launch",
-            "program": "mae/mae_visualization_2.py",
+            "program": "mae/mae_visualization.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
