@@ -39,14 +39,15 @@ class Video:
     def transformed_seg_cropped_imgs(self):
         transformed_seg_imgs = self.transformed_seg_imgs.clone()
         transformed_seg_cropped_imgs = []
-        for objects in transformed_seg_imgs:
+        for masks,objects in zip(self.masks_per_object,transformed_seg_imgs):
             transformed_seg_cropped_imgs_ = []
-            for frame in objects:
-                nonzero_rows = torch.where(frame.sum(1)!=0)[0]
-                nonzero_cols = torch.where(frame.sum(0)!=0)[0]
+            for mask,frame in zip(masks,objects):
+                nonzero_rows = torch.where(mask.sum(1).abs()>1e-5)[0]
+                nonzero_cols = torch.where(mask.sum(0).abs()>1e-5)[0]
                 up,down = nonzero_rows.min(),nonzero_rows.max()
                 left,right = nonzero_cols.min(),nonzero_cols.max()
                 transformed_seg_cropped_imgs_.append(frame[up:down,left:right])
+            print([f.shape for f in transformed_seg_cropped_imgs_])
             transformed_seg_cropped_imgs.append(transformed_seg_cropped_imgs_)
         return transformed_seg_cropped_imgs
 
