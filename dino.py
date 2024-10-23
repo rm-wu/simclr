@@ -158,13 +158,21 @@ def compute_masks_per_single_object(video, mean_thr=0.05, min_thr=0.02):
         raise ValueError('No good masks found')
 
 def compute_embeddings(frames, network, normalize=True):
-    assert frames.ndim==4, 'frames should have 4 dimensions'
-    if frames.shape[-3] != 3:
-        frames = frames.permute(0,3,1,2)
-    with torch.no_grad():
-        embeddings = network(frames)
-        if normalize:
-            embeddings = embeddings / embeddings.norm(2,-1,keepdim=True)
+    if isinstance(frames,list):
+        assert len(frames[0].shape)==3, 'frames should have 4 dims'
+        if frames[0].shape[-3] != 3:
+            frames = [frame.permute(2,0,1) for frame in frames]
+        with torch.no_grad():
+            embeddings = [network(frame.unsqueeze(0)) for frame in frames]
+        embeddings = torch.cat(embeddings)
+    else:
+        assert frames.ndim==4, 'frames should have 4 dimensions'
+        if frames.shape[-3] != 3:
+            frames = frames.permute(0,3,1,2)
+        with torch.no_grad():
+            embeddings = network(frames)
+    if normalize:
+        embeddings = embeddings / embeddings.norm(2,-1,keepdim=True)
     return embeddings
 
 def compute_cos_sims_per_objects(video, network, N_=20):
@@ -172,7 +180,7 @@ def compute_cos_sims_per_objects(video, network, N_=20):
     video.S_idx = range(0,(Nf//N_)*N_, (Nf//N_))
     embeddings = []
     for seg in video.transformed_seg_cropped_imgs:
-        embeddings_ = compute_embeddings(seg[video.S_idx], network)
+        embeddings_ = compute_embeddings([seg[i] for i in video.S_idx], network)
         embeddings.append(embeddings_) 
     video.embeddings = torch.stack(embeddings) # num_good_masks,N_,N_
 
@@ -183,11 +191,14 @@ def visualize_traj(video, Nmax=5, imagenet_reverse_transform=None):
         print(f'No similarity matrix computed, skipping video {video.name}')
     if imagenet_reverse_transform is None:
         imagenet_reverse_transform = T.Normalize(mean=(-0.485/0.229, -0.456/0.224, -0.406/0.225), std=(1/0.229, 1/0.224, 1/0.225))
-    N_,video_len = transformed_seg_imgs.shape[:2]
+    N_ = len(transformed_seg_imgs)
+    video_len = len(transformed_seg_imgs[0])
     T_ = 20 if S is None else S.shape[1] 
     S_idx = range(0,(video_len//20)*20,video_len//20) if S_idx is None else S_idx
     N_ = min(N_,Nmax)
     fig,ax = plt.subplots(N_+1, T_+1, figsize=(3*(T_+1),3*(N_+1)))
+    print([f.shape for f in video.transformed_seg_cropped_imgs[0]])
+    print([f.shape for f in video.transformed_seg_cropped_imgs[1]])
     # plot the video first
     for j in range(T_):
         ax[0,j].imshow(frames[S_idx[j]].cpu())
@@ -195,7 +206,7 @@ def visualize_traj(video, Nmax=5, imagenet_reverse_transform=None):
         ax[0,j].set_title('Frame {:d}'.format(S_idx[j]))
     for i in range(1,N_+1):
         for j in range(T_):
-            ax[i,j].imshow(apply_transform(transformed_seg_imgs[i-1,S_idx[j]],imagenet_reverse_transform).cpu())
+            ax[i,j].imshow(apply_transform(transformed_seg_imgs[i-1][S_idx[j]],imagenet_reverse_transform).cpu())
             # ax[i,j].imshow(imagenet_reverse_transform(transformed_seg_imgs[i-1,j*every].permute(2,0,1)).permute(1,2,0))
             ax[i,j].axis('off')
         if S is not None:
@@ -224,15 +235,15 @@ for i,video_name in enumerate(VIDEO_NAMES):
         frames_, seg_maps_ = build_video(video_name[:-4])
         if frames_ is not None:
             video = Video(video_name[:-4], frames_, seg_maps_, transform)
+            compute_masks_per_single_object(video) # num_good_masks,N,224,224,3
+            compute_cos_sims_per_objects(video, vits8)
+            visualize_traj(video)
             try:
-                compute_masks_per_single_object(video) # num_good_masks,N,224,224,3
-                compute_cos_sims_per_objects(video, vits8)
-                visualize_traj(video)
                 print(video.S.mean())
                 torch.save([video.frames, video.seg_maps, video.masks_per_object, video.embeddings], f'videos/{video.name}.pt')
                 del video
-            except:
-                print(f'Skipping {video.name} as no good segmentation maps found')
+            except Exception as e:
+                print(f'Skipping {video.name} due to Exception: ', e)
                 continue
         else:
             print(f'Skipping {video_name} as no good segmentation maps found')
