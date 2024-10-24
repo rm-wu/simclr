@@ -5,6 +5,15 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "ssl_visualization",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "ssl_tests/ssl_visualization.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+           
+        },
+        {
             "name": "mae visualize attention",
             "type": "debugpy",
             "request": "launch",
