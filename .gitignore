@@ -11,6 +11,8 @@ data_tars
 .DS_Store
 figs/
 errors/
+dino_errors/
+*.ipynb
 *.tar.gz
 *.tar
 old/

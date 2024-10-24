@@ -42,6 +42,28 @@ def make_square_tensor(image_tensor, fill_values=(-0.485/0.229, -0.456/0.224, -0
     padded_image = padded_image.permute(1, 2, 0)
     return padded_image
 
+def make_multiple_of(image_tensor, multiple_of=16, padding_values=(-0.485/0.229, -0.456/0.224, -0.406/0.225)):
+    # Split the image into its RGB channels
+    r_channel = image_tensor[:, :, 0]  # Red channel
+    g_channel = image_tensor[:, :, 1]  # Green channel
+    b_channel = image_tensor[:, :, 2]  # Blue channel
+
+    # Get the current width and height
+    h, w, _ = image_tensor.shape
+    
+    # Calculate padding required to make width and height multiples of 16
+    pad_h = (multiple_of - (h % multiple_of)) % multiple_of
+    pad_w = (multiple_of - (w % multiple_of)) % multiple_of
+
+    # Pad each channel individually using the provided padding values
+    r_padded = F.pad(r_channel, (0, pad_w, 0, pad_h), mode='constant', value=padding_values[0])
+    g_padded = F.pad(g_channel, (0, pad_w, 0, pad_h), mode='constant', value=padding_values[1])
+    b_padded = F.pad(b_channel, (0, pad_w, 0, pad_h), mode='constant', value=padding_values[2])
+
+    # Stack the channels back into a single tensor
+    padded_image = torch.stack([r_padded, g_padded, b_padded], dim=-1)  # Shape becomes [h, w, 3]
+    
+    return padded_image
 
 class Video:
     def __init__(self, name, frames, seg_maps, transform):
@@ -92,6 +114,7 @@ class Video:
                     left,right = 0,14
                 cropped_image = frame[up:down,left:right]
                 cropped_image = make_square_tensor(cropped_image)
+                cropped_image = make_multiple_of(cropped_image)
                 transformed_seg_cropped_imgs_.append(cropped_image)
             transformed_seg_cropped_imgs.append(transformed_seg_cropped_imgs_)
         return transformed_seg_cropped_imgs
