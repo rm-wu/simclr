@@ -9,7 +9,7 @@ from PIL import Image
 
 from util_utils import apply_transform
 
-def make_square_tensor(image_tensor, fill_values=(-0.485/0.229, -0.456/0.224, -0.406/0.225)):
+def make_square_tensor(image_tensor, min_wh=16, fill_values=(-0.485/0.229, -0.456/0.224, -0.406/0.225)):
     """
     Takes a non-square tensor image of shape [w, h, c] and returns a square tensor with the image centered.
 
@@ -23,46 +23,21 @@ def make_square_tensor(image_tensor, fill_values=(-0.485/0.229, -0.456/0.224, -0
     # Get original dimensions
     original_height, original_width, channels = image_tensor.shape
     # Calculate the size of the square
-    max_dim = max(14,max(original_width, original_height))
-    # Calculate padding for each side
-    pad_left = (max_dim - original_width) // 2
-    pad_right = max_dim - original_width - pad_left
-    pad_top = (max_dim - original_height) // 2
+    max_dim    = max(min_wh, max(original_width, original_height))
+    max_dim   += (multiple_of - (h % multiple_of)) % multiple_of
+    pad_left   = (max_dim - original_width) // 2
+    pad_right  = max_dim - original_width - pad_left
+    pad_top    = (max_dim - original_height) // 2
     pad_bottom = max_dim - original_height - pad_top
-    # Pad the image using F.pad
-    padded_channels = []
-    for channel in range(channels):
-        channel_tensor = image_tensor[:, :, channel]
-        padded_channel = F.pad(channel_tensor, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=fill_values[channel])
-        padded_channels.append(padded_channel)
-    padded_image = torch.stack(padded_channels, dim=0)
-    # padding = (pad_left, pad_right, pad_top, pad_bottom)  # (left, right, top, bottom)
-    # padded_image = F.pad(image_tensor.permute(2, 0, 1), padding, mode='constant', value=fill_value)
-    # Permute back to [w, h, c] format
-    padded_image = padded_image.permute(1, 2, 0)
-    return padded_image
-
-def make_multiple_of(image_tensor, multiple_of=16, padding_values=(-0.485/0.229, -0.456/0.224, -0.406/0.225)):
-    # Split the image into its RGB channels
-    r_channel = image_tensor[:, :, 0]  # Red channel
-    g_channel = image_tensor[:, :, 1]  # Green channel
-    b_channel = image_tensor[:, :, 2]  # Blue channel
-
-    # Get the current width and height
-    h, w, _ = image_tensor.shape
-    
-    # Calculate padding required to make width and height multiples of 16
-    pad_h = (multiple_of - (h % multiple_of)) % multiple_of
-    pad_w = (multiple_of - (w % multiple_of)) % multiple_of
-
-    # Pad each channel individually using the provided padding values
-    r_padded = F.pad(r_channel, (0, pad_w, 0, pad_h), mode='constant', value=padding_values[0])
-    g_padded = F.pad(g_channel, (0, pad_w, 0, pad_h), mode='constant', value=padding_values[1])
-    b_padded = F.pad(b_channel, (0, pad_w, 0, pad_h), mode='constant', value=padding_values[2])
-
+    # padding
+    r_channel,g_channel,b_channel = image_tensor[:, :, 0], image_tensor[:, :, 1], image_tensor[:, :, 2]  # channels
+    r_padded = F.pad(r_channel, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=padding_values[0])
+    g_padded = F.pad(g_channel, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=padding_values[1])
+    b_padded = F.pad(b_channel, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=padding_values[2])
     # Stack the channels back into a single tensor
     padded_image = torch.stack([r_padded, g_padded, b_padded], dim=-1)  # Shape becomes [h, w, 3]
-    
+    # Permute back to [w, h, c] format
+    padded_image = padded_image.permute(1, 2, 0)
     return padded_image
 
 class Video:
@@ -114,11 +89,9 @@ class Video:
                     left,right = 0,14
                 cropped_image = frame[up:down,left:right]
                 cropped_image = make_square_tensor(cropped_image)
-                cropped_image = make_multiple_of(cropped_image)
                 transformed_seg_cropped_imgs_.append(cropped_image)
             transformed_seg_cropped_imgs.append(transformed_seg_cropped_imgs_)
         return transformed_seg_cropped_imgs
-
 
 def get_unique_colors(seg_maps):
     # get unique segmentation colors
