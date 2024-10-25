@@ -78,45 +78,6 @@ for option in options:
     # )
 
 # %%
-
-
-# # %%
-# for model_option in options:
-#     args = Namespace(image_path="/home/mereur1/projects/ocl/ssl_nat_aug/ssl_tests/images/1.png",
-#                     output_dir="ssl_feats_vis/",
-#                     kmeans=20,
-#                     model_option=model_option)
-
-#     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-#     args.output_dir = (Path(args.output_dir) / args.model_option).resolve()
-#     args.output_dir.mkdir(parents=True, exist_ok=True)
-
-
-#     # model = prepare_model(args.pretrained_weights, args.arch, )
-
-#     model = original_models[args.model_option].to(device)
-#     p = model.patch_embed.patch_size
-#     stride = p if isinstance(p, int) else p[0]
-#     image = Image.open(args.image_path)
-#     image = image.convert("RGB")
-#     image_resized = process_image(image, stride, transforms)
-#     image_resized = image_resized.to(device)
-#     ic(image_resized.shape)
-#     ic(image_resized.dtype)
-#     with torch.no_grad():
-#         ori_feats = model.get_intermediate_layers(image_resized, n=[8,9,10,11], reshape=True, return_prefix_tokens=False,
-#                                     return_class_token=False, norm=True)
-
-
-#     ori_feats = ori_feats[-1]
-
-#     if args.kmeans != -1:
-#         ori_labels = kmeans_clustering(ori_feats, args.kmeans)
-#     else:
-#         ori_labels = None
-
-#     plot_feats(image, model_option, ori_feats, None, ori_labels, None, args.output_dir, 0)
-# %%
 for model_option in options:
     ic(model_option)
     args = Namespace(
@@ -150,11 +111,19 @@ for model_option in options:
             norm=True,
         )
         attn = model.get_last_selfattention(image_resized)
+    
     ic(attn.shape)
     ic(attn.max()) 
     ic(attn.min())
     ic(attn.mean())
     
+    ori_feats = ori_feats[-1]
+    if args.kmeans != -1:
+        ori_labels = kmeans_clustering(ori_feats, args.kmeans)
+    else:
+        ori_labels = None
+    plot_feats(image, model_option, ori_feats, None, ori_labels, None, args.output_dir, 0)
+
     if model_option in ["MAE", "DeiT-III"]:
         mean_attn = attn.mean(dim=1, keepdim=True)
         # attn = torch.where(attn > mean_attn, mean_attn, attn)
