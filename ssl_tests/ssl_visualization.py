@@ -20,6 +20,7 @@ from argparse import Namespace
 from PIL import Image
 from icecream import ic
 from pathlib import Path
+import einops as ein
 
 
 # %%
@@ -123,6 +124,7 @@ for model_option in options:
         output_dir="/home/mereur1/projects/ocl/ssl_nat_aug/ssl_tests/ssl_feats_vis/",
         kmeans=20,
         model_option=model_option,
+        use_cbar=False,
     )
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -149,7 +151,17 @@ for model_option in options:
         )
         attn = model.get_last_selfattention(image_resized)
     ic(attn.shape)
-    import einops as ein
+    ic(attn.max()) 
+    ic(attn.min())
+    ic(attn.mean())
+    
+    if model_option in ["MAE", "DeiT-III"]:
+        mean_attn = attn.mean(dim=1, keepdim=True)
+        # attn = torch.where(attn > mean_attn, mean_attn, attn)
+        attn = attn - attn.mean(dim=1, keepdim=True)
+        # attn = attn / attn.std(dim=1, keepdim=True)
+        if model_option == "MAE":
+            attn = attn / attn.std(dim=1, keepdim=True)
 
     for idx, at in enumerate(attn[0]):
         at = at[0]
@@ -167,13 +179,28 @@ for model_option in options:
         
         # TODO: make h and w dynamic
         at = ein.rearrange(at, "(h w) -> h w", h=h, w=w)
-        fig, ax = plt.subplots(figsize=(10, 10))
-        ax.axis("off")
-        ax.imshow(at.cpu().numpy())
-        plt.tight_layout()
-        plt.savefig(os.path.join(args.output_dir, f"attention_vis{idx}.png"))
-        plt.show()
-        plt.close(fig)
+        if args.use_cbar:
+            fig, (ax_img, ax_cbar) = plt.subplots(1, 2, figsize=(11, 10), 
+                                            gridspec_kw={'width_ratios': [20, 1]})
 
-
-# %%
+            # Plot the attention map
+            im = ax_img.imshow(at.cpu().numpy(), aspect='equal')
+            ax_img.axis("off")
+            
+            # Add a small, vertical colorbar
+            cbar = fig.colorbar(im, cax=ax_cbar)
+            ax_cbar.yaxis.tick_right()
+            ax_cbar.yaxis.set_label_position("right")
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(args.output_dir, f"attention_vis_cbar_{idx}.png"))
+            plt.show()
+            plt.close(fig)
+        else:
+            fig, ax = plt.subplots(figsize=(10, 10))
+            ax.axis("off")
+            ax.imshow(at.cpu().numpy())
+            plt.tight_layout()
+            plt.savefig(os.path.join(args.output_dir, f"attention_vis{idx}.png"))
+            plt.show()
+            plt.close(fig)
