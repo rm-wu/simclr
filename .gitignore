@@ -20,3 +20,4 @@ videos/
 *.pt
 *.pth
 *.zip
+ssl_libs/ssl_feats_vis/*

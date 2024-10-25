@@ -1,4 +1,4 @@
-# list all the folders in a directory
+# list all the folders in a direc§:tory
 import os, cv2, numpy as np
 
 import torch
@@ -14,44 +14,44 @@ from util_utils     import print_gpu_memory, get_root_folder, apply_transform
 from embed_utils    import compute_cos_sims_per_objects
 from plot_utils     import visualize_traj
 
-ROOT = get_root_folder()
-VIDEO_NAMES = os.listdir(os.path.join(ROOT, 'videos'))
+VIDEO_FOLDER = 'videos_mae'
+VIDEO_NAMES  = os.listdir(VIDEO_FOLDER)
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 # transform = T.Compose([T.Resize(224),T.CenterCrop(224),T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
 transform = T.Compose([T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
 imagenet_reverse_transform = T.Normalize(mean=(-0.485/0.229, -0.456/0.224, -0.406/0.225), std=(1/0.229, 1/0.224, 1/0.225))
 
-# read the embeddings
-# saved_videos = os.listdir('videos/')
-# all_embeddings = []
-# all_labels     = []
-# num_objects    = []
-# loaded_videos  = []
-# last_label     = -1
-# for i,video in enumerate(saved_videos):
-#     print(i,len(saved_videos))
-#     if i==185:
-#         continue
-#     try:
-#         frames, seg_maps, masks_per_object, embeddings = torch.load(f'videos/{video}',map_location=device) # embeddings: [num_good_masks,N_,q]
-#         class_labels = (last_label+1+torch.arange(embeddings.shape[0])).unsqueeze(0).repeat(embeddings.shape[1],1).T.flatten()
-#         reshaped_embeddings = embeddings.reshape(-1,embeddings.shape[-1])
-#         all_embeddings.append(reshaped_embeddings) # num_good_masks*N_,q
-#         all_labels.append(class_labels) # num_good_masks*N_
-#         last_label += embeddings.shape[0]
-#         num_objects.append(embeddings.shape[0])
-#         loaded_videos.append(video)
-#     except Exception as e:
-#         print(video, e)
-#         continue
+# :read the embeddings
+saved_videos = os.listdir(VIDEO_FOLDER)
+all_embeddings = []
+all_labels     = []
+num_objects    = []
+loaded_videos  = []
+last_label     = -1
+for i,video in enumerate(saved_videos):
+    print(i,len(saved_videos))
+    if i==185:
+        continue
+    try:
+        frames, seg_maps, masks_per_object, embeddings = torch.load(f'{VIDEO_FOLDER}/{video}',map_location=device) # embeddings: [num_good_masks,N_,q]
+        class_labels = (last_label+1+torch.arange(embeddings.shape[0])).unsqueeze(0).repeat(embeddings.shape[1],1).T.flatten()
+        reshaped_embeddings = embeddings.reshape(-1,embeddings.shape[-1])
+        all_embeddings.append(reshaped_embeddings) # num_good_masks*N_,q
+        all_labels.append(class_labels) # num_good_masks*N_
+        last_label += embeddings.shape[0]
+        num_objects.append(embeddings.shape[0])
+        loaded_videos.append(video)
+    except Exception as e:
+        print(video, e)
+        continue
 
-# all_labels = torch.cat(all_labels)
-# all_embeddings = torch.cat(all_embeddings)
-# num_objects = torch.tensor(num_objects)
-# print(all_labels.shape, all_embeddings.shape, num_objects.shape, num_objects.sum())
-# torch.save([all_labels, all_embeddings, num_objects, loaded_videos], 'videos_embeddings.pt')
+all_labels = torch.cat(all_labels)
+all_embeddings = torch.cat(all_embeddings)
+num_objects = torch.tensor(num_objects)
+print(all_labels.shape, all_embeddings.shape, num_objects.shape, num_objects.sum())
+torch.save([all_labels, all_embeddings, num_objects, loaded_videos], f'{VIDEO_FOLDER}/videos_embeddings.pt')
 
-all_labels, all_embeddings, num_objects, loaded_videos = torch.load('videos_embeddings.pt')
+# all_labels, all_embeddings, num_objects, loaded_videos = torch.load(f'{VIDEO_FOLDER}/videos_embeddings.pt')
 
 # compute nearest neighbors
 similarity = torch.zeros(all_embeddings.shape[0],all_embeddings.shape[0])
@@ -93,7 +93,7 @@ def get_frame(anchor_idx):
     frame_id_anchor   = anchor_idx%20
     video_name = loaded_videos[video_id_anchor]
     print(video_id_anchor, seg_map_id_anchor, frame_id_anchor)
-    frames, seg_maps, masks_per_object, embeddings = torch.load(f'videos/{video_name}',map_location=device)
+    frames, seg_maps, masks_per_object, embeddings = torch.load(f'{VIDEO_FOLDER}/{video_name}',map_location=device)
     video = Video(None, frames, seg_maps, transform)
     video.masks_per_object = masks_per_object
     frame = video.transformed_seg_cropped_imgs[seg_map_id_anchor][frame_id_anchor]
@@ -101,7 +101,7 @@ def get_frame(anchor_idx):
     return apply_transform(frame,imagenet_reverse_transform).cpu(), video_id_anchor, seg_map_id_anchor, frame_id_anchor
 
 for j in range(50):
-    if f'{j}.png' in os.listdir('errors'):
+    if f'{j}.png' in os.listdir(f'{VIDEO_FOLDER}/errors'):
         continue
     fig,ax = plt.subplots(6,10,figsize=(30,18),squeeze=False)
     for i in range(j*10,(j+1)*10):
@@ -121,5 +121,5 @@ for j in range(50):
             ax[k+1,i%10].axis('off');
     plt.tight_layout()
     plt.show()
-    plt.savefig(f'errors/{j}.png',dpi=200)
+    plt.savefig(f'{VIDEO_FOLDER}/errors/{j}.png',dpi=200)
     plt.close()
