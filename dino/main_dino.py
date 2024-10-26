@@ -173,7 +173,8 @@ def train_dino(args, logger):
     )
     # dataset = datasets.ImageFolder(args.data_path, transform=transform)
     data_path = Path(args.data_path).resolve()
-    logger.debug(data_path)
+    if utils.is_main_process():
+        logger.debug(data_path)
     dataset = datasets.ImageNet(root=str(data_path), split='train', transform=transform)
     sampler = torch.utils.data.DistributedSampler(dataset, shuffle=True)
     data_loader = torch.utils.data.DataLoader(
@@ -555,9 +556,11 @@ class DataAugmentationDINO(object):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('DINO', parents=[get_args_parser()])
     args = parser.parse_args()
-    
-    logger = setup_logger(args.output_dir)
-    logger.info(f"Arguments: {args}")
+    if utils.is_main_process():
+        logger = setup_logger(args.output_dir)
+        logger.info(f"Arguments: {args}")
+    else:
+        logger = None
     
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     
