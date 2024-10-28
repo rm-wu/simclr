@@ -41,19 +41,20 @@ def video_2_image(video, ROOT, mean_thr=0.05):
     from pathlib import Path
     from torchvision.utils import save_image
     Path(f"{ROOT}/imgs/{video.name}").mkdir(parents=True, exist_ok=True)
+    print(video.name, 'num_sequences:', len(transformed_seg_cropped_imgs), f'{ROOT}/imgs/{video.name}')
     for i,(imgs,masks) in enumerate(zip(transformed_seg_cropped_imgs,video.masks_per_object)):
-        print(i)
         for j,(img,mask) in enumerate(zip(imgs,masks)):
             if mask.mean([-1,-2]) > 1e-3:
                 save_image(img.permute(2,0,1).cpu(), f"{ROOT}/imgs/{video.name}/{i}_{j}.JPEG")
 
 
 for i,video_name in enumerate(VIDEO_NAMES):
-    video_name = VIDEO_NAMES[1]
     if i%10==0:
         print(f'{i}/{len(VIDEO_NAMES)}')
+    if os.path.exists(f'{ROOT}/imgs/{video_name[:-4]}'):
+        continue
     frames_, seg_maps_ = build_video(ROOT, video_name[:-4], device)
     video = Video(video_name[:-4], frames_, seg_maps_, transform=None)
     compute_masks_per_single_object(video)
-    video_2_image(video, ROOT)
+    video_2_image(video, ROOT, mean_thr=0.01)
     del video

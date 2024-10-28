@@ -9,7 +9,7 @@ from PIL import Image
 
 from util_utils import apply_transform
 
-def make_square_tensor(image_tensor, min_wh=16, fill_values=(-0.485/0.229, -0.456/0.224, -0.406/0.225)):
+def make_square_tensor(image_tensor, min_wh=16, padding_values=(-0.485/0.229, -0.456/0.224, -0.406/0.225)):
     """
     Takes a non-square tensor image of shape [w, h, c] and returns a square tensor with the image centered.
 
@@ -24,7 +24,7 @@ def make_square_tensor(image_tensor, min_wh=16, fill_values=(-0.485/0.229, -0.45
     original_height, original_width, channels = image_tensor.shape
     # Calculate the size of the square
     max_dim    = max(min_wh, max(original_width, original_height))
-    max_dim   += (multiple_of - (h % multiple_of)) % multiple_of
+    max_dim   += (min_wh - (max_dim % min_wh)) % min_wh
     pad_left   = (max_dim - original_width) // 2
     pad_right  = max_dim - original_width - pad_left
     pad_top    = (max_dim - original_height) // 2
@@ -36,8 +36,6 @@ def make_square_tensor(image_tensor, min_wh=16, fill_values=(-0.485/0.229, -0.45
     b_padded = F.pad(b_channel, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=padding_values[2])
     # Stack the channels back into a single tensor
     padded_image = torch.stack([r_padded, g_padded, b_padded], dim=-1)  # Shape becomes [h, w, 3]
-    # Permute back to [w, h, c] format
-    padded_image = padded_image.permute(1, 2, 0)
     return padded_image
 
 class Video:
@@ -64,7 +62,10 @@ class Video:
         transformed_seg_imgs = []
         for masks in self.masks_per_object:
             seg_imgs = self.frames.to(torch.float32) / 255 * masks[:,:,:,None]
-            transformed_seg_imgs_ = apply_transform(seg_imgs, self.transform) # [N,W,H,3] or [W,H,3]
+            if self.transform is None:
+                transformed_seg_imgs_ = seg_imgs
+            else:
+                transformed_seg_imgs_ = apply_transform(seg_imgs, self.transform) # [N,W,H,3] or [W,H,3]
             transformed_seg_imgs.append(transformed_seg_imgs_)
         transformed_seg_imgs = torch.stack(transformed_seg_imgs) # num_good_masks,N,W,H,3
         return transformed_seg_imgs
@@ -79,12 +80,10 @@ class Video:
                 nonzero_cols = torch.where(mask.sum(0).abs()>1e-5)[0]
                 try:
                     up,down = nonzero_rows.min(),nonzero_rows.max()
-                    assert down-up>14
                 except:
                     up,down = 0,14
                 try:
                     left,right = nonzero_cols.min(),nonzero_cols.max()
-                    assert right-left>14
                 except:
                     left,right = 0,14
                 cropped_image = frame[up:down,left:right]
