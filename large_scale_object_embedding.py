@@ -53,8 +53,7 @@ def custom_collate_fn(batch):
     return list(images), list(paths)
 
 DATA_DIR   = '/home/bethge/cyildiz40/data/VidOR/imgs/'
-# MODEL_NAME = 'DINOv2-reg'
-MODEL_NAME = 'CLIP'
+MODEL_NAME = 'DINOv2-reg' # 'CLIP'
 RESULT_FOLDER = "object_embeddings"
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 model  = load_model(MODEL_NAME)
