@@ -10,19 +10,28 @@ from embed_utils         import compute_embeddings
 
 class PadToMultipleOf14:
     def __call__(self, image):
-        # Ensure the input is a PIL image
-        if not isinstance(image, Image.Image):
-            raise TypeError("Input image must be a PIL image")
-        width, height = image.size
+        # Ensure the input is a torch tensor
+        if not isinstance(image, torch.Tensor):
+            raise TypeError("Input image must be a torch tensor")
+        # Check if image has a channel dimension (e.g., CxHxW or HxW)
+        if image.dim() == 3:
+            c, h, w = image.shape
+        elif image.dim() == 2:
+            h, w = image.shape
+            c = 1  # Single channel grayscale assumed
+            image = image.unsqueeze(0)  # Add channel dimension
+        else:
+            raise ValueError("Unsupported image dimensions")
         # Calculate the nearest multiple of 14 that is greater than the current size
-        new_size = math.ceil(width / 14) * 14
-        # Calculate padding on each side to center the original image
-        pad_left = (new_size - width) // 2
-        pad_top = (new_size - height) // 2
-        pad_right = new_size - width - pad_left
-        pad_bottom = new_size - height - pad_top
-        # Apply padding using torchvision's functional.pad, with black padding (0)
-        padded_image = F.pad(image, (pad_left, pad_top, pad_right, pad_bottom), fill=0)
+        new_size = math.ceil(max(h, w) / 14) * 14
+        # Calculate padding needed on each side
+        pad_left = (new_size - w) // 2
+        pad_top = (new_size - h) // 2
+        pad_right = new_size - w - pad_left
+        pad_bottom = new_size - h - pad_top
+        # Apply padding with black (0) pixels
+        padded_image = F.pad(image, (pad_left, pad_right, pad_top, pad_bottom), value=0)
+
         return padded_image
 
 class CustomImageDataset(Dataset):
