@@ -4,6 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms as T
 from pathlib import Path
 
+import torch
 from ssl_libs.load_model import load_model, compute_features
 from embed_utils         import compute_embeddings
 
@@ -35,7 +36,8 @@ def custom_collate_fn(batch):
     return list(images), list(paths)
 
 DATA_DIR   = '/home/bethge/cyildiz40/data/VidOR/imgs/'
-MODEL_NAME = 'MAE'
+# MODEL_NAME = 'DINOv2-reg'
+MODEL_NAME = 'CLIP'
 RESULT_FOLDER = "object_embeddings"
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 model  = load_model(MODEL_NAME)
@@ -51,10 +53,9 @@ dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_
 # Loop through the dataloader
 EMBEDDINGS, FNAMES = [],[]
 for i,(images,paths) in enumerate(dataloader):
-    print(paths)  # Prints the list of (folder_and_file_name) strings
     embeddings = compute_embeddings(images, model, normalize=True)
     EMBEDDINGS.append(embeddings)
     FNAMES += paths
     if i%50==0:
-        print(f'Saving at iter {i}')
+        print(f'Saving at iter {i}/{len(dataloader)}')
         torch.save([torch.cat(EMBEDDINGS), FNAMES], f'{RESULT_FOLDER}/{MODEL_NAME}_embeddings.pt')

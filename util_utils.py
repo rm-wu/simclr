@@ -19,6 +19,8 @@ def get_root_folder():
         else:
             return '/mnt/lustre/work/bethge/cyildiz40/projects/videossl/VidOR'
 
+def get_device(model):
+    return list(model.parameters())[0].device
 
 def apply_transform(frames, transform):
     ''' frames could be channel first or last'''
