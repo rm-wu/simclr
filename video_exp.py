@@ -1,3 +1,8 @@
+''' Open video files
+    Extracts object trajectories based on segmentation maps 
+    Computes embeddings (for each frame)
+    Saves the videos and object trajectories
+'''
 import os, cv2, numpy as np
 
 import torch

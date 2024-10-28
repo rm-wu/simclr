@@ -1,4 +1,4 @@
-
+''' This script extracts and saves individual objects from videos and their segmentation maps '''
 import os, cv2, numpy as np
 
 import torch
