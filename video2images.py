@@ -49,6 +49,8 @@ def video_2_image(video, ROOT, mean_thr=-0.01):
 
 
 for i,video_name in enumerate(VIDEO_NAMES):
+    if i>2:
+        break
     if i%10==0:
         print(f'{i}/{len(VIDEO_NAMES)}')
     # if os.path.exists(f'{ROOT}/imgs/{video_name[:-4]}'):
