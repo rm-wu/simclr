@@ -23,7 +23,7 @@ transform   = T.Compose([T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.2
 imagenet_reverse_transform = T.Normalize(mean=(-0.485/0.229, -0.456/0.224, -0.406/0.225), std=(1/0.229, 1/0.224, 1/0.225))
 
 
-def video_2_image(video, ROOT, mean_thr=0.05):
+def video_2_image(video, ROOT, mean_thr=-0.01):
     seg_maps = video.seg_maps
     unique_colors = get_unique_colors(seg_maps)
     masks_per_object = []
@@ -44,17 +44,17 @@ def video_2_image(video, ROOT, mean_thr=0.05):
     print(video.name, 'num_sequences:', len(transformed_seg_cropped_imgs), f'{ROOT}/imgs/{video.name}')
     for i,(imgs,masks) in enumerate(zip(transformed_seg_cropped_imgs,video.masks_per_object)):
         for j,(img,mask) in enumerate(zip(imgs,masks)):
-            if mask.mean([-1,-2]) > 1e-3:
+            if mask.mean([-1,-2]) > 1e-2:
                 save_image(img.permute(2,0,1).cpu(), f"{ROOT}/imgs/{video.name}/{i}_{j}.JPEG")
 
 
 for i,video_name in enumerate(VIDEO_NAMES):
     if i%10==0:
         print(f'{i}/{len(VIDEO_NAMES)}')
-    if os.path.exists(f'{ROOT}/imgs/{video_name[:-4]}'):
-        continue
+    # if os.path.exists(f'{ROOT}/imgs/{video_name[:-4]}'):
+    #     continue
     frames_, seg_maps_ = build_video(ROOT, video_name[:-4], device)
     video = Video(video_name[:-4], frames_, seg_maps_, transform=None)
     compute_masks_per_single_object(video)
-    video_2_image(video, ROOT, mean_thr=0.01)
+    video_2_image(video, ROOT)
     del video
