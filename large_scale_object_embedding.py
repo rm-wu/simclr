@@ -64,26 +64,27 @@ def custom_collate_fn(batch):
     return list(images), list(paths)
 
 DATA_DIR   = '/home/bethge/cyildiz40/data/VidOR/imgs/'
-MODEL_NAME = 'DINOv2-reg' # 'CLIP'
 RESULT_FOLDER = "object_embeddings"
-device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-model  = load_model(MODEL_NAME)
 Path(RESULT_FOLDER).mkdir(parents=True, exist_ok=True)
 
-if 'DINO' in MODEL_NAME:
-    transform  = T.Compose([T.ToTensor(), PadToMultipleOf14(), T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
-else:
-    transform  = T.Compose([T.ToTensor(), T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
+device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
-dataset    = CustomImageDataset(root_dir=DATA_DIR, transform=transform)
-dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_fn)
+for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
+    model  = load_model(MODEL_NAME)
 
-# Loop through the dataloader
-EMBEDDINGS, FNAMES = [],[]
-for i,(images,paths) in enumerate(dataloader):
-    embeddings = compute_embeddings(images, model, normalize=True)
-    EMBEDDINGS.append(embeddings)
-    FNAMES += paths
-    if i%50==0:
-        print(f'Saving at iter {i}/{len(dataloader)}')
-        torch.save([torch.cat(EMBEDDINGS), FNAMES], f'{RESULT_FOLDER}/{MODEL_NAME}_embeddings.pt')
+    if 'DINO' in MODEL_NAME:
+        transform  = T.Compose([T.ToTensor(), PadToMultipleOf14(), T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
+    else:
+        transform  = T.Compose([T.ToTensor(), T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
+
+    dataset    = CustomImageDataset(root_dir=DATA_DIR, transform=transform)
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_fn)
+    # Loop through the dataloader
+    EMBEDDINGS, FNAMES = [],[]
+    for i,(images,paths) in enumerate(dataloader):
+        embeddings = compute_embeddings(images, model, normalize=True)
+        EMBEDDINGS.append(embeddings)
+        FNAMES += paths
+        if i%50==0:
+            print(f'Saving at iter {i}/{len(dataloader)}')
+            torch.save([torch.cat(EMBEDDINGS), FNAMES], f'{RESULT_FOLDER}/{MODEL_NAME}_embeddings.pt')

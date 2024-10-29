@@ -7,6 +7,8 @@ from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
 from torchvision import transforms as T
 from PIL import Image
+from pathlib import Path
+from torchvision.utils import save_image
 
 from ssl_libs.load_model import load_model, compute_features
 from video          import Video, compute_masks_per_single_object, get_unique_colors
@@ -27,6 +29,7 @@ def video_2_image(video, ROOT, mean_thr=-0.01):
     seg_maps = video.seg_maps
     unique_colors = get_unique_colors(seg_maps)
     masks_per_object = []
+    Path(f"{ROOT}/imgs/{video.name}").mkdir(parents=True, exist_ok=True)
     for color in unique_colors:
         masks = torch.stack([(m == color).all(dim=-1) for m in seg_maps]) # num_frames, width, height
         means_across_frames = masks.float().mean(-1).mean(-1)
@@ -38,9 +41,6 @@ def video_2_image(video, ROOT, mean_thr=-0.01):
     transformed_seg_cropped_imgs = video.transformed_seg_cropped_imgs
     video.masks_per_object = video.masks_per_object.to(torch.float16)
     # save the video
-    from pathlib import Path
-    from torchvision.utils import save_image
-    Path(f"{ROOT}/imgs/{video.name}").mkdir(parents=True, exist_ok=True)
     print(video.name, 'num_sequences:', len(transformed_seg_cropped_imgs), f'{ROOT}/imgs/{video.name}')
     for i,(imgs,masks) in enumerate(zip(transformed_seg_cropped_imgs,video.masks_per_object)):
         for j,(img,mask) in enumerate(zip(imgs,masks)):
@@ -49,14 +49,16 @@ def video_2_image(video, ROOT, mean_thr=-0.01):
 
 
 for i,video_name in enumerate(VIDEO_NAMES):
-    if i>2:
-        break
     if i%10==0:
         print(f'{i}/{len(VIDEO_NAMES)}')
-    # if os.path.exists(f'{ROOT}/imgs/{video_name[:-4]}'):
-    #     continue
-    frames_, seg_maps_ = build_video(ROOT, video_name[:-4], device)
-    video = Video(video_name[:-4], frames_, seg_maps_, transform=None)
-    compute_masks_per_single_object(video)
+    if os.path.exists(f'{ROOT}/imgs/{video_name[:-4]}'):
+        continue
+    try:
+        frames_, seg_maps_ = build_video(ROOT, video_name[:-4], device)
+        video = Video(video_name[:-4], frames_, seg_maps_, transform=None)
+        compute_masks_per_single_object(video)
+    except Exception as e:
+        print(f'Skiping video {video_name} due to exception:', e)
+        continue
     video_2_image(video, ROOT)
     del video
