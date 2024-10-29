@@ -39,13 +39,15 @@ def make_square_tensor(image_tensor, min_wh=16, padding_values=(-0.485/0.229, -0
     return padded_image
 
 class Video:
-    def __init__(self, name, frames, seg_maps, transform):
+    def __init__(self, name, frames, seg_maps, transform=None, is_square=True):
         self.name = name
         self.frames = frames # num_frames, width, height, channels, int between [0,255]
         self.seg_maps = seg_maps # num_frames, width, height, channels
         self.masks_per_object = None # will be of shape [num_good_masks,W,H]
         self.embeddings = None # embeddings of shape [num_good_masks,N_,q] where N_ is a user input
         self.transform = transform
+        self.is_square = is_square
+        self.S_idx = None
     @property
     def Nf(self):
         return len(self.frames)
@@ -56,26 +58,14 @@ class Video:
             return None
         return (self.embeddings.unsqueeze(1) * self.embeddings.unsqueeze(2)).sum(-1)
     @property
-    def transformed_seg_imgs(self):
+    def transformed_seg_cropped_imgs(self):
         if self.masks_per_object is None:
             raise ValueError('No masks found')
-        transformed_seg_imgs = []
+        imgs_float = self.frames.to(torch.float32) / 255
+        all_cropped_masked_images = []
         for masks in self.masks_per_object:
-            seg_imgs = self.frames.to(torch.float32) / 255 * masks[:,:,:,None]
-            if self.transform is None:
-                transformed_seg_imgs_ = seg_imgs
-            else:
-                transformed_seg_imgs_ = apply_transform(seg_imgs, self.transform) # [N,W,H,3] or [W,H,3]
-            transformed_seg_imgs.append(transformed_seg_imgs_)
-        transformed_seg_imgs = torch.stack(transformed_seg_imgs) # num_good_masks,N,W,H,3
-        return transformed_seg_imgs
-    @property
-    def transformed_seg_cropped_imgs(self):
-        transformed_seg_imgs = self.transformed_seg_imgs.clone()
-        transformed_seg_cropped_imgs = []
-        for masks,objects in zip(self.masks_per_object,transformed_seg_imgs):
-            transformed_seg_cropped_imgs_ = []
-            for mask,frame in zip(masks,objects):
+            cropped_masked_images = []
+            for i,mask in enumerate(masks):
                 nonzero_rows = torch.where(mask.sum(1).abs()>1e-5)[0]
                 nonzero_cols = torch.where(mask.sum(0).abs()>1e-5)[0]
                 try:
@@ -86,11 +76,15 @@ class Video:
                     left,right = nonzero_cols.min(),nonzero_cols.max()
                 except:
                     left,right = 0,14
-                cropped_image = frame[up:down,left:right]
-                cropped_image = make_square_tensor(cropped_image)
-                transformed_seg_cropped_imgs_.append(cropped_image)
-            transformed_seg_cropped_imgs.append(transformed_seg_cropped_imgs_)
-        return transformed_seg_cropped_imgs
+                masked_image = imgs_float[i] * masks[i][:,:,None] # w,h,c
+                cropped_masked_image = masked_image[up:down, left:right]
+                if self.transform is not None:
+                    cropped_masked_image = apply_transform(cropped_masked_image, self.transform) # [N,W,H,3] or [W,H,3]
+                if self.is_square:
+                    cropped_masked_image = make_square_tensor(cropped_masked_image)
+                cropped_masked_images.append(cropped_masked_image)
+            all_cropped_masked_images.append(cropped_masked_images)
+        return all_cropped_masked_images # num_good_masks,N,W,H,3
 
 def get_unique_colors(seg_maps):
     # get unique segmentation colors
