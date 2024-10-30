@@ -158,7 +158,7 @@ def get_args_parser():
     return parser
 
 
-def train_dino(args, logger):
+def train_dino(args):
     utils.init_distributed_mode(args)
     utils.fix_random_seeds(args.seed)
     print("git:\n  {}\n".format(utils.get_sha()))
@@ -171,9 +171,19 @@ def train_dino(args, logger):
         args.local_crops_scale,
         args.local_crops_number,
     )
+
     # dataset = datasets.ImageFolder(args.data_path, transform=transform)
     data_path = Path(args.data_path).resolve()
-    logger.debug(data_path)
+
+    local_rank = int(os.environ["LOCAL_RANK"])
+    global_rank = int(os.environ["RANK"])
+
+    if global_rank == 0:
+        logger = setup_logger(args.output_dir)
+        logger.info(f"Arguments: {args}")
+        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+        logger.debug(args.data_path)
+
     dataset = datasets.ImageNet(root=str(data_path), split='train', transform=transform)
     sampler = torch.utils.data.DistributedSampler(dataset, shuffle=True)
     data_loader = torch.utils.data.DataLoader(
@@ -556,12 +566,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('DINO', parents=[get_args_parser()])
     args = parser.parse_args()
     
-    logger = setup_logger(args.output_dir)
-    logger.info(f"Arguments: {args}")
-    
-    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-    
-    
     # if args.local_rank == 0:  # only on main process
     # if utils.is_main_process():
     #     # Initialize wandb run
@@ -572,4 +576,4 @@ if __name__ == '__main__':
     #             project=args.project,
     #             name=args.name,
     #         )    
-    train_dino(args, logger)
+    train_dino(args)
