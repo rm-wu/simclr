@@ -91,7 +91,7 @@ def get_args_parser():
     parser.add_argument('--entity', default='aalto_ml', type=str, help="wandb entity")
     parser.add_argument('--project', default='ssl_nat_aug', type=str, help="wandb project")
     parser.add_argument('--name', default='dino_base', type=str, help="wandb run name")
-    parser.add_argument('--use_wandb', default=True, action="store_true", help="use wandb")
+    parser.add_argument('--use_wandb', default=False, action="store_true", help="use wandb")
     
     # Temperature teacher parameters
     parser.add_argument('--warmup_teacher_temp', default=0.04, type=float,
@@ -154,7 +154,7 @@ def get_args_parser():
     parser.add_argument('--num_workers', default=10, type=int, help='Number of data loading workers per GPU.')
     parser.add_argument("--dist_url", default="env://", type=str, help="""url used to set up
         distributed training; see https://pytorch.org/docs/stable/distributed.html""")
-    parser.add_argument("--local_rank", default=0, type=int, help="Please ignore and do not set this argument.")
+    parser.add_argument("--local-rank", default=0, type=int, help="Please ignore and do not set this argument.")
     return parser
 
 
