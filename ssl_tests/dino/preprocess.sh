@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# credits for this script: https://github.com/pytorch/examples/blob/main/imagenet/extract_ILSVRC.sh
+
 #
 # script to extract ImageNet dataset
 # ILSVRC2012_img_train.tar (about 138 GB)
