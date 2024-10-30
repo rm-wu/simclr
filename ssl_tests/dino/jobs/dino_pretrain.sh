@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=dino_pretrain      # Job name
-#SBATCH --output=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/logs/dino_pretrain.o%j # Name of stdout output file
-#SBATCH --error=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/logs/dino_pretrain.e%j  # Name of stderr error file
+#SBATCH --output=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/logs/dino_pretrain.o%j # Name of stdout output file
+#SBATCH --error=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/logs/dino_pretrain.e%j  # Name of stderr error file
 #SBATCH --partition=standard-g   # partition name
-#SBATCH --time=0-01:00:00        # Run time (d-hh:mm:ss)
+#SBATCH --time=0-00:20:00        # Run time (d-hh:mm:ss)
 #SBATCH --account=project_462000585  # Project for billing
 #SBATCH --mem=200G
 #SBATCH --mail-type=ALL
@@ -33,7 +33,7 @@ export NCCL_NET_GDR_LEVEL=3
 
 echo NODE IP: $MASTER_ADDR
 srun python3 -m torch.distributed.run --nproc_per_node=8 --nnodes=2 --rdzv_id $RANDOM --rdzv_backend c10d --rdzv_endpoint $MASTER_ADDR:$MASTER_PORT \
-    /scratch/project_462000585/mereuric/ssl_nat_aug/dino/main_dino.py \
+    /scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/main_dino.py \
     --arch=vit_small \
     --patch_size=16 \
     --out_dim=65536 \
@@ -60,5 +60,5 @@ srun python3 -m torch.distributed.run --nproc_per_node=8 --nnodes=2 --rdzv_id $R
     --momentum_teacher=0.996 \
     --use_bn_in_head=false \
     --drop_path_rate=0.1 \
-    --data_path=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/data/imagenet/ \
-    --output_dir=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/outputs/
+    --data_path=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/data/imagenet/ \
+    --output_dir=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/outputs/
