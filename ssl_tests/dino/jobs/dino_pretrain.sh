@@ -60,5 +60,5 @@ srun python3 -m torch.distributed.run --nproc_per_node=8 --nnodes=2 --rdzv_id $R
     --momentum_teacher=0.996 \
     --use_bn_in_head=false \
     --drop_path_rate=0.1 \
-    --data_path=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/data/ \
+    --data_path=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/data/imagenet \
     --output_dir=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/outputs/
