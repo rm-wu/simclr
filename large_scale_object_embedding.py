@@ -70,6 +70,7 @@ Path(RESULT_FOLDER).mkdir(parents=True, exist_ok=True)
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
 for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
+# for MODEL_NAME in ['MAE']:
     model  = load_model(MODEL_NAME)
 
     if 'DINO' in MODEL_NAME:
