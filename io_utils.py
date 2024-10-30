@@ -14,7 +14,7 @@ def video2frames(mp4_file):
     while success:
         frames.append(image)   
         success,image = vidcap.read()
-    frames = np.array(frames)
+    frames = np.array(frames)[:,:,:,[2,1,0]]
     return frames # num_frames, width, height, channels
 
 def read_segmentation_maps(ROOT, mp4_file, width, height):
