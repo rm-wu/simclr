@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=test_ddp      # Job name
-#SBATCH --output=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/logs/test_ddp.o%j # Name of stdout output file
-#SBATCH --error=/scratch/project_462000585/mereuric/ssl_nat_aug/dino/logs/test_ddp.e%j  # Name of stderr error file
+#SBATCH --output=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/logs/test_ddp.o%j # Name of stdout output file
+#SBATCH --error=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/logs/test_ddp.e%j  # Name of stderr error file
 #SBATCH --partition=standard-g   # partition name
 #SBATCH --time=0-00:20:00        # Run time (d-hh:mm:ss)
 #SBATCH --account=project_462000585  # Project for billing
@@ -33,4 +33,4 @@ export NCCL_NET_GDR_LEVEL=3
 
 echo NODE IP: $MASTER_ADDR
 srun python3 -m torch.distributed.run --nproc_per_node=8 --nnodes=2 --rdzv_id $RANDOM --rdzv_backend c10d --rdzv_endpoint $MASTER_ADDR:$MASTER_PORT \
-    /scratch/project_462000585/mereuric/ssl_nat_aug/dino/lumi_test.py 50 10
+    /scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/lumi_test.py 50 10
