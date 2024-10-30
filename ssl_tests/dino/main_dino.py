@@ -177,12 +177,21 @@ def train_dino(args):
 
     local_rank = int(os.environ["LOCAL_RANK"])
     global_rank = int(os.environ["RANK"])
+    args.global_rank = global_rank 
+    args.local_rank = local_rank
 
     if global_rank == 0:
         logger = setup_logger(args.output_dir)
         logger.info(f"Arguments: {args}")
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         logger.debug(args.data_path)
+        if args.use_wandb:
+            print(f"{utils.is_main_process()} {utils.get_rank()}")
+            run = wandb.init(
+                entity=args.entity,
+                project=args.project,
+                name=args.name,
+            )    
 
     dataset = datasets.ImageNet(root=str(data_path), split='train', transform=transform)
     sampler = torch.utils.data.DistributedSampler(dataset, shuffle=True)
@@ -379,12 +388,14 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
             loss = dino_loss(student_output, teacher_output, epoch)
         
         pbar.set_postfix(loss=f"{loss.item():.4f}")
+        if args.global_rank == 0:
         # if utils.is_main_process():
-        #     if args.use_wandb:
-        #         wandb.log({"train/loss": loss.item(),
-        #                    "train/lr": optimizer.param_groups[0]["lr"],
-        #                    "train/wd": optimizer.param_groups[0]["weight_decay"]})
-        # print(loss.item())
+            if args.use_wandb:
+                wandb.log({"train/loss": loss.item(),
+                           "train/lr": optimizer.param_groups[0]["lr"],
+                           "train/wd": optimizer.param_groups[0]["weight_decay"]})
+            print(loss.item())
+
 
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()), force=True)
