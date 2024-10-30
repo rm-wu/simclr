@@ -4,6 +4,8 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
+
         {
             "name": "ssl_visualization",
             "type": "debugpy",
@@ -52,6 +54,23 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "main_dino.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/ssl_tests/dino/main_dino.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "LOCAL_RANK": "0",
+            },
+            "args": [
+                "--data_path",
+                "/home/mereur1/projects/ocl/ssl_nat_aug/ssl_tests/dino/data/imagenet",
+                "--arch",
+                "vit_small"
+            ]   
         },
         {
             "name": "train.py",
