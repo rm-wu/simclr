@@ -1,0 +1,10 @@
+module purge
+module load mamba
+
+mkdir $WRKDIR/.conda_pkgs
+mkdir $WRKDIR/.conda_envs
+
+conda config --append pkgs_dirs ~/.conda/pkgs
+conda config --append envs_dirs ~/.conda/envs
+conda config --prepend pkgs_dirs $WRKDIR/.conda_pkgs
+conda config --prepend envs_dirs $WRKDIR/.conda_envs
