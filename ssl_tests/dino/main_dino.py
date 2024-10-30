@@ -362,7 +362,10 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Epoch: [{}/{}]'.format(epoch, args.epochs)
     
-    pbar = tqdm(data_loader, ncols=100, desc="Training")
+    if args.global_rank == 0:   
+        pbar = tqdm(data_loader, ncols=100, desc="Training")
+    else:
+        pbar = data_loader
     
     # pbar = tqdm(enumerate(data_loader), total=len(data_loader), 
     #             desc=header, ncols=100, leave=False)
@@ -387,14 +390,15 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
             student_output = student(images)
             loss = dino_loss(student_output, teacher_output, epoch)
         
-        pbar.set_postfix(loss=f"{loss.item():.4f}")
+        
         if args.global_rank == 0:
+            pbar.set_postfix(loss=f"{loss.item():.4f}")
         # if utils.is_main_process():
             if args.use_wandb:
                 wandb.log({"train/loss": loss.item(),
                            "train/lr": optimizer.param_groups[0]["lr"],
                            "train/wd": optimizer.param_groups[0]["weight_decay"]})
-            print(loss.item())
+            # print(loss.item())
 
 
         if not math.isfinite(loss.item()):
