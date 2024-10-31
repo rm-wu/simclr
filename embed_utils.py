@@ -1,7 +1,7 @@
 import torch
 from util_utils import get_device
 
-def compute_embeddings(frames, network, normalize=True):
+def compute_embeddings(frames, network, patchwise=False, normalize=True):
     device = get_device(network)
     if isinstance(frames,list):
         assert len(frames[0].shape)==3, 'frames should have 4 dims'
@@ -10,14 +10,20 @@ def compute_embeddings(frames, network, normalize=True):
         frames = [frame.to(device) for frame in frames]
         with torch.no_grad():
             # print([f.size() for f in frames])
-            embeddings = [network(frame.unsqueeze(0)) for frame in frames]
+            if patchwise:
+                embeddings = [network.get_intermediate_layers(frame.unsqueeze(0), n=[11], reshape=True, return_prefix_tokens=False, norm=True)[0] for frame in frames]
+            else:
+                embeddings = [network(frame.unsqueeze(0)) for frame in frames]
         embeddings = torch.cat(embeddings)
     else:
         assert frames.ndim==4, 'frames should have 4 dimensions'
         if frames.shape[-3] != 3:
             frames = frames.permute(0,3,1,2).to(device)
         with torch.no_grad():
-            embeddings = network(frames)
+            if patchwise:
+                embeddings = network.get_intermediate_layers(frames, n=[11], reshape=True, return_prefix_tokens=False, norm=True)[0]
+            else:
+                embeddings = network(frames)
     if normalize:
         embeddings = embeddings / embeddings.norm(2,-1,keepdim=True)
     return embeddings
