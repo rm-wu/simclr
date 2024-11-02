@@ -55,10 +55,11 @@ srun python3 -m torch.distributed.run --nproc_per_node=8 --nnodes=2 --rdzv_id $R
     --local_crops_scale 0.05 0.25 \
     --local_crops_number=10 \
     --seed=0 \
-    --num_workers=10 \
     --optimizer=adamw \
     --momentum_teacher=0.996 \
     --use_bn_in_head=false \
     --drop_path_rate=0.1 \
     --data_path=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/data/imagenet \
-    --output_dir=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/outputs/ --use_wandb 
+    --output_dir=/scratch/project_462000585/mereuric/ssl_nat_aug/ssl_tests/dino/outputs/ --use_wandb \
+    --num_workers=1 \
+      # --num_workers=10 

@@ -38,7 +38,6 @@ import logging
 from tqdm import tqdm, trange 
 import wandb
 
-torch.set_float32_matmul_precision('high')
 
 
 def setup_logger(output_dir):
