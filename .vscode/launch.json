@@ -4,7 +4,23 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
+        {
+            "name": "eda",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "notebooks/example.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
+
+        {
+            "name": "video_cube",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "ssl_tests/video_cube.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
 
         {
             "name": "ssl_visualization",
