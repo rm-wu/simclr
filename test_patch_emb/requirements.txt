@@ -10,3 +10,4 @@ torch_kmeans
 gradio
 spaces
 einops
+seaborn
