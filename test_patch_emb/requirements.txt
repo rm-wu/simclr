@@ -9,3 +9,4 @@ timm==0.9.10
 torch_kmeans
 gradio
 spaces
+einops

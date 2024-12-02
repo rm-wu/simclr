@@ -84,13 +84,13 @@ for option in options:
 
 # %%
 # Get embeddings
-def get_embeddings(model, dataloader):
+def get_embeddings(model, dataloader, device="cuda"):
     p = model.patch_embed.patch_size
     stride = p if isinstance(p, int) else p[0]
     embeddings = []
     for i, batch in enumerate(dataloader):
         img, _ = batch
-        img = torch.stack(img)
+        img = torch.stack(img).to(device)
         h, w = img.shape[2:]
         height_int = (h // stride)*stride
         width_int = (w // stride)*stride
@@ -114,8 +114,11 @@ def get_embeddings(model, dataloader):
 
 model_option = 'DINOv2'
 args = Namespace(
+    # dataset_path="/home/mereur1/projects/ocl/data/COCO/val2017",
     dataset_path="/ssd/hizlic1/repository-object-centric/ms-coco-ml4h/val2017/1",
+    # annotations_path="/home/mereur1/projects/ocl/data/COCO/annotations/instances_val2017.json",
     annotations_path="/ssd/hizlic1/repository-object-centric/ms-coco-ml4h/annotations/instances_val2017.json",
+    # output_dir="/home/mereur1/projects/ocl/ssl_nat_aug/test_patch_emb/ssl_feats",
     output_dir="/ssd/hizlic1/repository-object-centric/ssl_nat_aug/ssl_tests/ssl_feats/",
     kmeans=-1,
     model_option=model_option,

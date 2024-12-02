@@ -232,3 +232,4 @@ def kmeans_clustering(feats_map, n_clusters=20):
     label_map = Image.fromarray(label_map)
 
     return label_map
+
