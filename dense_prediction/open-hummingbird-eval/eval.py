@@ -63,6 +63,7 @@ def main(args):
         # Path to the dataset to use for evaluation
         data_dir=args.data_dir,
         out_dir=out_dir,
+        num_workers=64,
         memory_size=args.memory_size if args.memory_size > -1 else None,
     )
     np.save(os.path.join(out_dir, "hbird_miou.npy"), np.array([hbird_miou]))
