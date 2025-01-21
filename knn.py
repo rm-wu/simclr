@@ -45,14 +45,12 @@ def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True):
 
     for start in range(0, num_embeddings, batch_size):
         end = min(start + batch_size, num_embeddings)
-        current_embeddings = all_embeddings[start:end]
+        current_embeddings = all_embeddings[start:end] # batch_size,q
 
         # Compute similarity for current batch
         for i in range(0, num_embeddings, batch_size):
             last_idx = min(i + batch_size, num_embeddings)
-            similarity[:, i:last_idx] = (
-                (current_embeddings.unsqueeze(1) * all_embeddings[i:last_idx]).sum(-1)
-            )
+            similarity[:, i:last_idx] = (current_embeddings.unsqueeze(1) * all_embeddings[i:last_idx].unsqueeze(0)).sum(-1)
 
         # Set diagonal elements to a large negative value for the current batch
         for i in range(end - start):
