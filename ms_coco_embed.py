@@ -82,17 +82,22 @@ def return_dataset(output_dir="ms_coco/ms_coco_objects", metadata_file="metadata
 
 
 for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
-    model = load_model(MODEL_NAME).to(device)
-    data_loader = return_dataset(pad=16 if MODEL_NAME=='CLIP' else -1)
-    embeddings, labels = [],[]
-    for img, label in data_loader:
-        img = img.to(device)
-        embeddings.append(compute_embeddings(img, model, patchwise=False, normalize=False))
-        labels.append(label)
-        print(len(embeddings))
-    embeddings, labels = torch.cat(embeddings), torch.cat(labels)
+    # if embeddings are already computed, load them
+    fname = os.path.join('ms_coco', f'{MODEL_NAME}_ms_coco_embeddings.pt')
+    if os.path.exists(fname):
+        embeddings, labels = torch.load(fname)
+    else:
+        model = load_model(MODEL_NAME).to(device)
+        data_loader = return_dataset(pad=16 if MODEL_NAME=='CLIP' else -1)
+        embeddings, labels = [],[]
+        for img, label in data_loader:
+            img = img.to(device)
+            embeddings.append(compute_embeddings(img, model, patchwise=False, normalize=False))
+            labels.append(label)
+            print(len(embeddings))
+        embeddings, labels = torch.cat(embeddings), torch.cat(labels)
+        torch.save([embeddings, labels], fname)
     print(embeddings.shape, labels.shape)
-    torch.save([embeddings, labels], f'{MODEL_NAME}_ms_coco_embeddings.pt')
     retrieval_rate, misclassified_idx, _ = compute_knn(embeddings, labels, normalize=False)
     print(f'{MODEL_NAME} retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
     retrieval_rate, misclassified_idx = compute_knn(embeddings, labels, normalize=False)
