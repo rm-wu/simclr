@@ -1,40 +1,13 @@
 import os
-import math
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms as T
 from pathlib import Path
-import torch.nn.functional as F
 
 import torch
 from ssl_libs.load_model import load_model, compute_features
-from embed_utils         import compute_embeddings
+from embed_utils         import compute_embeddings, PadToMultipleOf14
 
-class PadToMultipleOf14:
-    def __call__(self, image):
-        # Ensure the input is a torch tensor
-        if not isinstance(image, torch.Tensor):
-            raise TypeError("Input image must be a torch tensor")
-        # Check if image has a channel dimension (e.g., CxHxW or HxW)
-        if image.dim() == 3:
-            c, h, w = image.shape
-        elif image.dim() == 2:
-            h, w = image.shape
-            c = 1  # Single channel grayscale assumed
-            image = image.unsqueeze(0)  # Add channel dimension
-        else:
-            raise ValueError("Unsupported image dimensions")
-        # Calculate the nearest multiple of 14 that is greater than the current size
-        new_size = math.ceil(max(h, w) / 14) * 14
-        # Calculate padding needed on each side
-        pad_left = (new_size - w) // 2
-        pad_top = (new_size - h) // 2
-        pad_right = new_size - w - pad_left
-        pad_bottom = new_size - h - pad_top
-        # Apply padding with black (0) pixels
-        padded_image = F.pad(image, (pad_left, pad_right, pad_top, pad_bottom), value=0)
-
-        return padded_image
 
 class CustomImageDataset(Dataset):
     def __init__(self, root_dir, transform=None):

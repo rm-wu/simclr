@@ -59,14 +59,19 @@ class ObjectDataset(Dataset):
             img_tensor = img_tensor[:, y_min:y_max+1, x_min:x_max+1]
         return img_tensor, label
 
-# Example usage of the data loader
-output_dir = "processed_objects"
-metadata_file = os.path.join(output_dir, "metadata.pkl")
-dataset = ObjectDataset(metadata_file)
-data_loader = DataLoader(dataset, batch_size=32, shuffle=True)
+def return_dataset(output_dir="ms_coco_objects", metadata_file="metadata.pkl"):
+    metadata_file = os.path.join(output_dir, metadata_file)
+    dataset = ObjectDataset(metadata_file)
+    data_loader = DataLoader(dataset, batch_size=32, shuffle=True)
+    return data_loader
 
-# Iterate through the DataLoader
-for images, labels in data_loader:
-    print(images.shape, labels.shape)
-    break
+# compute embeddings
+from embed_utils import compute_embeddings, PadToMultipleOf14
+from util_utils import get_device
+from ssl_libs.load_model import load_model
+device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+
+for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
+    model = load_model(MODEL_NAME).to(device)
+    data_loader = return_dataset(output_dir=f'mscoco_objects')
 
