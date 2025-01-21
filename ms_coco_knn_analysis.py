@@ -100,5 +100,5 @@ for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
     print(embeddings.shape, labels.shape)
     retrieval_rate, misclassified_idx, _ = compute_knn(embeddings, labels, normalize=False)
     print(f'{MODEL_NAME} retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
-    retrieval_rate, misclassified_idx = compute_knn(embeddings, labels, normalize=False)
+    retrieval_rate, misclassified_idx, _ = compute_knn(embeddings, labels, normalize=False)
     print(f'{MODEL_NAME} (normalized) retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
