@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
 from torchvision import transforms as T
+import torch.nn.functional as F
 from PIL import Image
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -29,7 +30,7 @@ def compute_knn(all_embeddings, all_labels, normalize=True):
     _,nearest_neighbors = similarity.topk(5,dim=1)
     retrieval_rate = torch.stack([all_labels[i]==all_labels[nearest_neighbors[i,0]] for i in range(similarity.shape[0])]).to(torch.float32).mean() # check if the labels are the same
     misclassified_idx = [i for i in range(similarity.shape[0]) if all_labels[i]!=all_labels[nearest_neighbors[i,0]]]
-    return retrieval_rate, misclassified_idx
+    return retrieval_rate, misclassified_idx, nearest_neighbors
 
 def main():
     VIDEO_FOLDER = 'videos_mae'
@@ -71,7 +72,7 @@ def main():
 
     # all_labels, all_embeddings, num_objects, loaded_videos = torch.load(f'{VIDEO_FOLDER}/videos_embeddings.pt')
 
-    retrieval_rate, misclassified_idx = compute_knn(all_embeddings, all_labels, normalize=True)
+    retrieval_rate, misclassified_idx, nearest_neighbors = compute_knn(all_embeddings, all_labels, normalize=True)
 
     transform = T.Compose([T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
     imagenet_reverse_transform = T.Normalize(mean=(-0.485/0.229, -0.456/0.224, -0.406/0.225), std=(1/0.229, 1/0.224, 1/0.225))

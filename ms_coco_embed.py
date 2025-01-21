@@ -10,6 +10,12 @@ from torchvision import models, datasets, tv_tensors
 from torchvision import transforms as T
 from torchvision.utils import make_grid
 
+from embed_utils import compute_embeddings, PadToMultipleOf
+from util_utils import get_device
+from ssl_libs.load_model import load_model
+from knn import compute_knn
+device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+
 from torch.utils.data import Dataset, DataLoader
 
 import types
@@ -41,9 +47,10 @@ def show(imgs):
 
 # Data loader for the saved objects
 class ObjectDataset(Dataset):
-    def __init__(self, metadata_file):
+    def __init__(self, metadata_file, transform=None):
         with open(metadata_file, "rb") as f:
             self.metadata = pickle.load(f)
+        self.transform = transform
     def __len__(self):
         return len(self.metadata)
     def __getitem__(self, idx):
@@ -57,24 +64,24 @@ class ObjectDataset(Dataset):
             y_min, x_min = non_zero_coords.min(dim=0).values
             y_max, x_max = non_zero_coords.max(dim=0).values
             img_tensor = img_tensor[:, y_min:y_max+1, x_min:x_max+1]
+        if self.transform:
+            img_tensor = self.transform(img_tensor)
         return img_tensor, label
 
-def return_dataset(output_dir="ms_coco_objects", metadata_file="metadata.pkl"):
+def return_dataset(output_dir="mscoco_objects", metadata_file="metadata.pkl", pad=-1):
     metadata_file = os.path.join(output_dir, metadata_file)
-    dataset = ObjectDataset(metadata_file)
+    if pad>0:
+        transform = T.Compose([PadToMultipleOf(pad)])
+    else:
+        transform = None
+    dataset = ObjectDataset(metadata_file, transform=transform)
     data_loader = DataLoader(dataset, batch_size=32, shuffle=True)
     return data_loader
 
-# compute embeddings
-from embed_utils import compute_embeddings, PadToMultipleOf14
-from util_utils import get_device
-from ssl_libs.load_model import load_model
-from knn import compute_knn
-device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
 for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
     model = load_model(MODEL_NAME).to(device)
-    data_loader = return_dataset()
+    data_loader = return_dataset(pad=16 if MODEL_NAME=='CLIP' else -1)
     embeddings, labels = [],[]
     for img, label in data_loader:
         img = img.to(device)
@@ -83,7 +90,7 @@ for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
     embeddings, labels = torch.cat(embeddings), torch.cat(labels)
     print(embeddings.shape, labels.shape)
     torch.save([embeddings, labels], f'{MODEL_NAME}_embeddings.pt')
-    retrieval_rate, misclassified_idx = compute_knn(embeddings, labels, normalize=False)
+    retrieval_rate, misclassified_idx, _ = compute_knn(embeddings, labels, normalize=False)
     print(f'{MODEL_NAME} retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
     retrieval_rate, misclassified_idx = compute_knn(embeddings, labels, normalize=False)
     print(f'{MODEL_NAME} (normalized) retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
