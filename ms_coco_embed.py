@@ -87,6 +87,7 @@ for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
         img = img.to(device)
         embeddings.append(compute_embeddings(img, model, patchwise=False, normalize=False))
         labels.append(label)
+        print(len(embeddings))
     embeddings, labels = torch.cat(embeddings), torch.cat(labels)
     print(embeddings.shape, labels.shape)
     torch.save([embeddings, labels], f'{MODEL_NAME}_embeddings.pt')
