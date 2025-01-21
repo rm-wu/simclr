@@ -14,6 +14,23 @@ from util_utils     import print_gpu_memory, get_root_folder, apply_transform
 from embed_utils    import compute_cos_sims_per_objects
 from plot_utils     import visualize_traj
 
+def compute_knn(all_embeddings, all_labels, normalize=True):
+    if normalize:
+        all_embeddings = F.normalize(all_embeddings,dim=-1)
+    # compute nearest neighbors
+    similarity = torch.zeros(all_embeddings.shape[0],all_embeddings.shape[0])
+    for i in range(0,all_embeddings.shape[0],1000):
+        for j in range(0,all_embeddings.shape[0],1000):
+            similarity[i:i+1000,j:j+1000] = (all_embeddings[i:i+1000].unsqueeze(1) * all_embeddings[j:j+1000]).sum(-1)
+
+    for i in range(all_embeddings.shape[0]):
+        similarity[i,i] = -1e0
+
+    _,nearest_neighbors = similarity.topk(5,dim=1)
+    retrieval_rate = torch.stack([all_labels[i]==all_labels[nearest_neighbors[i,0]] for i in range(similarity.shape[0])]).to(torch.float32).mean() # check if the labels are the same
+    misclassified_idx = [i for i in range(similarity.shape[0]) if all_labels[i]!=all_labels[nearest_neighbors[i,0]]]
+    return retrieval_rate, misclassified_idx
+
 VIDEO_FOLDER = 'videos_mae'
 VIDEO_NAMES  = os.listdir(VIDEO_FOLDER)
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
@@ -53,20 +70,7 @@ torch.save([all_labels, all_embeddings, num_objects, loaded_videos], f'{VIDEO_FO
 
 # all_labels, all_embeddings, num_objects, loaded_videos = torch.load(f'{VIDEO_FOLDER}/videos_embeddings.pt')
 
-# compute nearest neighbors
-similarity = torch.zeros(all_embeddings.shape[0],all_embeddings.shape[0])
-for i in range(0,all_embeddings.shape[0],1000):
-    for j in range(0,all_embeddings.shape[0],1000):
-        similarity[i:i+1000,j:j+1000] = (all_embeddings[i:i+1000].unsqueeze(1) * all_embeddings[j:j+1000]).sum(-1)
-
-for i in range(all_embeddings.shape[0]):
-    similarity[i,i] = -1e0
-
-_,nearest_neighbors = similarity.topk(5,dim=1)
-retrieval_rate = torch.stack([all_labels[i]==all_labels[nearest_neighbors[i,0]] for i in range(similarity.shape[0])]).to(torch.float32).mean() # check if the labels are the same
-print(retrieval_rate.item())
-
-misclassified_idx = [i for i in range(similarity.shape[0]) if all_labels[i]!=all_labels[nearest_neighbors[i,0]]]
+retrieval_rate, misclassified_idx = compute_knn(all_embeddings, all_labels, normalize=True)
 
 transform = T.Compose([T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))])
 imagenet_reverse_transform = T.Normalize(mean=(-0.485/0.229, -0.456/0.224, -0.406/0.225), std=(1/0.229, 1/0.224, 1/0.225))

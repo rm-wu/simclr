@@ -69,9 +69,21 @@ def return_dataset(output_dir="ms_coco_objects", metadata_file="metadata.pkl"):
 from embed_utils import compute_embeddings, PadToMultipleOf14
 from util_utils import get_device
 from ssl_libs.load_model import load_model
+from knn import compute_knn
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
 for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
     model = load_model(MODEL_NAME).to(device)
-    data_loader = return_dataset(output_dir=f'mscoco_objects')
-
+    data_loader = return_dataset()
+    embeddings, labels = [],[]
+    for img, label in data_loader:
+        img = img.to(device)
+        embeddings.append(compute_embeddings(img, model, patchwise=False, normalize=False))
+        labels.append(label)
+    embeddings, labels = torch.cat(embeddings), torch.cat(labels)
+    print(embeddings.shape, labels.shape)
+    torch.save([embeddings, labels], f'{MODEL_NAME}_embeddings.pt')
+    retrieval_rate, misclassified_idx = compute_knn(embeddings, labels, normalize=False)
+    print(f'{MODEL_NAME} retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
+    retrieval_rate, misclassified_idx = compute_knn(embeddings, labels, normalize=False)
+    print(f'{MODEL_NAME} (normalized) retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
