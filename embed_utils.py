@@ -4,7 +4,9 @@ import torch.nn.functional as F
 import math
 
 class PadToMultipleOf:
-    def __call__(self, image, multiple=14):
+    def __init__(self, multiple):
+        self.multiple = multiple
+    def __call__(self, image):
         # Ensure the input is a torch tensor
         if not isinstance(image, torch.Tensor):
             raise TypeError("Input image must be a torch tensor")
@@ -18,7 +20,7 @@ class PadToMultipleOf:
         else:
             raise ValueError("Unsupported image dimensions")
         # Calculate the nearest multiple of 14 that is greater than the current size
-        new_size = math.ceil(max(h, w) / multiple) * multiple
+        new_size = math.ceil(max(h, w) / self.multiple) * self.multiple
         # Calculate padding needed on each side
         pad_left = (new_size - w) // 2
         pad_top = (new_size - h) // 2
