@@ -98,6 +98,6 @@ for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
         torch.save([embeddings, labels], fname)
     print(embeddings.shape, labels.shape)
     retrieval_rate, misclassified_idx, _ = compute_knn(embeddings, labels, normalize=False)
-    print(f'{MODEL_NAME} retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
+    print(f'{MODEL_NAME} retrieval rate: {retrieval_rate} accuracy: {1-len(misclassified_idx)/embeddings.shape[0]}')
     retrieval_rate, misclassified_idx, _ = compute_knn(embeddings, labels, normalize=False)
-    print(f'{MODEL_NAME} (normalized) retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
+    print(f'{MODEL_NAME} (normalized) retrieval rate: {retrieval_rate} accuracy: {1-len(misclassified_idx)/embeddings.shape[0]}')
