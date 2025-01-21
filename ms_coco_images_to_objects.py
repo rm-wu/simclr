@@ -89,7 +89,8 @@ for k in categ_map.keys():
 
 # %%
 res = 322
-transform = T.Compose([T.Resize(res, Image.NEAREST), T.CenterCrop(res), T.ToTensor(), T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),])
+# transform = T.Compose([T.Resize(res, Image.NEAREST), T.CenterCrop(res), T.ToTensor(), T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),])
+transform = T.Compose([T.Resize(res, Image.NEAREST), T.CenterCrop(res), T.ToTensor(),])
 dataset_val = datasets.CocoDetection(root=IMAGES_PATH, annFile=ANNOTATIONS_PATH, transform=transform)
 dataset_val = datasets.wrap_dataset_for_transforms_v2(dataset_val, target_keys=["boxes", "labels", "masks", "image_id", "segmentation"])
 dataloader_val = torch.utils.data.DataLoader(
@@ -99,10 +100,8 @@ dataloader_val = torch.utils.data.DataLoader(
     collate_fn=lambda batch: tuple(zip(*batch)),
 )
 
-invTrans = T.Compose([ T.Normalize(mean = [ 0., 0., 0. ],
-                                                     std = [ 1/0.229, 1/0.224, 1/0.225 ]),
-                                T.Normalize(mean = [ -0.485, -0.456, -0.406 ],
-                                                     std = [ 1., 1., 1. ]),])
+invTrans = T.Compose([ T.Normalize(mean = [ 0., 0., 0. ], std = [ 1/0.229, 1/0.224, 1/0.225 ]),
+                                T.Normalize(mean = [ -0.485, -0.456, -0.406 ], std = [ 1., 1., 1. ]),])
 
 # %%
 for i, batch in enumerate(dataloader_val):
@@ -148,9 +147,8 @@ def save_object(image_tensor, label, obj_idx, img_idx):
         "label": label
     }
 
-MASK_OUT = False
-L = len(dataset_val)
-# L = 201
+# L = len(dataset_val)
+L = 20
 for idx in range(L):
     img, target = dataset_val[idx]
     if len(list(target.keys()))!=5:
@@ -159,15 +157,12 @@ for idx in range(L):
         obj_mask = target['masks'][obj_idx]
         obj_mask = resize_transform(obj_mask.unsqueeze(0).float())
         if obj_mask.any():  # Ensure there is an object
-            if MASK_OUT:
-                # Remove black (masked-out) areas
-                obj_mask = obj_mask.squeeze(0).byte()
-                img_masked = img.clone()
-                img_masked[:, obj_mask == 0] = 0  # Black out masked regions
-                # Save the object image and label metadata
-                metadata = save_object(img_masked, target['labels'][obj_idx].item(), obj_idx, idx)
-            else:
-                metadata = save_object(img, target['labels'][obj_idx].item(), obj_idx, idx)
+            # Remove black (masked-out) areas
+            obj_mask = obj_mask.squeeze(0).byte()
+            img_masked = img.clone()
+            img_masked[:, obj_mask == 0] = 0  # Black out masked regions
+            # Save the object image and label metadata
+            metadata = save_object(img_masked, target['labels'][obj_idx].item(), obj_idx, idx)
             saved_metadata.append(metadata)
     # Periodically save metadata to a file
     if idx % save_interval == 0 and idx > 0:
@@ -180,63 +175,3 @@ with open(os.path.join(output_dir, "metadata.pkl"), "wb") as f:
     pickle.dump(saved_metadata, f)
 
 print("Final metadata saved.")
-
-# %% [markdown]
-# ## data loader to load all objects
-
-# %%
-# Data loader for the saved objects
-class ObjectDataset(Dataset):
-    def __init__(self, metadata_file):
-        with open(metadata_file, "rb") as f:
-            self.metadata = pickle.load(f)
-    def __len__(self):
-        return len(self.metadata)
-    def __getitem__(self, idx):
-        entry = self.metadata[idx]
-        img = Image.open(entry["file_path"]).convert("RGB")
-        label = entry["label"]
-        return T.ToTensor()(img), label
-
-# Example usage of the data loader
-metadata_file = os.path.join(output_dir, "metadata.pkl")
-dataset = ObjectDataset(metadata_file)
-data_loader = DataLoader(dataset, batch_size=32, shuffle=True)
-
-# Iterate through the DataLoader
-for images, labels in data_loader:
-    print(images.shape, labels.shape)
-
-
-# %%
-
-def get_device(model):
-    return list(model.parameters())[0].device
-
-def compute_embeddings(frames, network, patchwise=False, normalize=True):
-    device = get_device(network)
-    if isinstance(frames,list):
-        assert len(frames[0].shape)==3, 'frames should have 4 dims'
-        if frames[0].shape[-3] != 3:
-            frames = [frame.permute(2,0,1) for frame in frames]
-        frames = [frame.to(device) for frame in frames]
-        with torch.no_grad():
-            if patchwise:
-                embeddings = [network.get_intermediate_layers(frame.unsqueeze(0), n=[11], reshape=True, return_prefix_tokens=False, norm=True)[0] for frame in frames]
-            else:
-                embeddings = [network(frame.unsqueeze(0)) for frame in frames]
-        embeddings = torch.cat(embeddings)
-    else:
-        assert frames.ndim==4, 'frames should have 4 dimensions'
-        if frames.shape[-3] != 3:
-            frames = frames.permute(0,3,1,2).to(device)
-        with torch.no_grad():
-            if patchwise:
-                embeddings = network.get_intermediate_layers(frames, n=[11], reshape=True, return_prefix_tokens=False, norm=True)[0]
-            else:
-                embeddings = network(frames)
-    if normalize:
-        embeddings = embeddings / embeddings.norm(2,-1,keepdim=True)
-    return embeddings
-
-
