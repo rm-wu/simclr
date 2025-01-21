@@ -37,17 +37,18 @@ def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True):
         all_embeddings = F.normalize(all_embeddings, dim=-1)
     
     num_embeddings = all_embeddings.shape[0]
-    similarity = torch.zeros(batch_size, num_embeddings, device=all_embeddings.device)
     
     nearest_neighbors_list = []
     retrieval_rates = []
     misclassified_indices = []
 
     for start in range(0, num_embeddings, batch_size):
+        print(start)
         end = min(start + batch_size, num_embeddings)
         current_embeddings = all_embeddings[start:end] # batch_size,q
+        similarity = torch.zeros(current_embeddings.shape[0], num_embeddings, device=all_embeddings.device)
 
-        # Compute similarity for current batch
+        # Compute similarity for current batchprint(start)
         for i in range(0, num_embeddings, batch_size):
             last_idx = min(i + batch_size, num_embeddings)
             similarity[:, i:last_idx] = (current_embeddings.unsqueeze(1) * all_embeddings[i:last_idx].unsqueeze(0)).sum(-1)
