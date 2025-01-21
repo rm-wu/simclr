@@ -21,3 +21,5 @@ videos/
 *.pth
 *.zip
 ssl_libs/ssl_feats_vis/*
+objects
+mae_errors/
