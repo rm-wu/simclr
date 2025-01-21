@@ -15,22 +15,71 @@ from util_utils     import print_gpu_memory, get_root_folder, apply_transform
 from embed_utils    import compute_cos_sims_per_objects
 from plot_utils     import visualize_traj
 
-def compute_knn(all_embeddings, all_labels, normalize=True):
+# def compute_knn(all_embeddings, all_labels, normalize=True):
+#     if normalize:
+#         all_embeddings = F.normalize(all_embeddings,dim=-1)
+#     # compute nearest neighbors
+#     similarity = torch.zeros(all_embeddings.shape[0],all_embeddings.shape[0])
+#     for i in range(0,all_embeddings.shape[0],1000):
+#         for j in range(0,all_embeddings.shape[0],1000):
+#             similarity[i:i+1000,j:j+1000] = (all_embeddings[i:i+1000].unsqueeze(1) * all_embeddings[j:j+1000]).sum(-1)
+
+#     for i in range(all_embeddings.shape[0]):
+#         similarity[i,i] = -1e0
+
+#     _,nearest_neighbors = similarity.topk(5,dim=1)
+#     retrieval_rate = torch.stack([all_labels[i]==all_labels[nearest_neighbors[i,0]] for i in range(similarity.shape[0])]).to(torch.float32).mean() # check if the labels are the same
+#     misclassified_idx = [i for i in range(similarity.shape[0]) if all_labels[i]!=all_labels[nearest_neighbors[i,0]]]
+    # return retrieval_rate, misclassified_idx, nearest_neighbors
+
+def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True):
     if normalize:
-        all_embeddings = F.normalize(all_embeddings,dim=-1)
-    # compute nearest neighbors
-    similarity = torch.zeros(all_embeddings.shape[0],all_embeddings.shape[0])
-    for i in range(0,all_embeddings.shape[0],1000):
-        for j in range(0,all_embeddings.shape[0],1000):
-            similarity[i:i+1000,j:j+1000] = (all_embeddings[i:i+1000].unsqueeze(1) * all_embeddings[j:j+1000]).sum(-1)
+        all_embeddings = F.normalize(all_embeddings, dim=-1)
+    
+    num_embeddings = all_embeddings.shape[0]
+    similarity = torch.zeros(batch_size, num_embeddings, device=all_embeddings.device)
+    
+    nearest_neighbors_list = []
+    retrieval_rates = []
+    misclassified_indices = []
 
-    for i in range(all_embeddings.shape[0]):
-        similarity[i,i] = -1e0
+    for start in range(0, num_embeddings, batch_size):
+        end = min(start + batch_size, num_embeddings)
+        current_embeddings = all_embeddings[start:end]
 
-    _,nearest_neighbors = similarity.topk(5,dim=1)
-    retrieval_rate = torch.stack([all_labels[i]==all_labels[nearest_neighbors[i,0]] for i in range(similarity.shape[0])]).to(torch.float32).mean() # check if the labels are the same
-    misclassified_idx = [i for i in range(similarity.shape[0]) if all_labels[i]!=all_labels[nearest_neighbors[i,0]]]
-    return retrieval_rate, misclassified_idx, nearest_neighbors
+        # Compute similarity for current batch
+        for i in range(0, num_embeddings, batch_size):
+            similarity[:, i:i+batch_size] = (
+                (current_embeddings.unsqueeze(1) * all_embeddings[i:i+batch_size]).sum(-1)
+            )
+
+        # Set diagonal elements to a large negative value for the current batch
+        for i in range(end - start):
+            similarity[i, start + i] = -1e0
+
+        # Get top-5 nearest neighbors for the current batch
+        _, nearest_neighbors = similarity[:end - start].topk(5, dim=1)
+        nearest_neighbors_list.append(nearest_neighbors + start)
+
+        # Compute retrieval rate for the current batch
+        retrieval_rate_batch = torch.stack([
+            all_labels[start + i] == all_labels[nearest_neighbors[i, 0]]
+            for i in range(end - start)
+        ]).to(torch.float32).mean()
+        retrieval_rates.append(retrieval_rate_batch.item())
+
+        # Track misclassified indices for the current batch
+        misclassified_idx_batch = [
+            start + i for i in range(end - start)
+            if all_labels[start + i] != all_labels[nearest_neighbors[i, 0]]
+        ]
+        misclassified_indices.extend(misclassified_idx_batch)
+
+    # Combine all metrics
+    overall_retrieval_rate = sum(retrieval_rates) / len(retrieval_rates)
+    nearest_neighbors_combined = torch.cat(nearest_neighbors_list, dim=0)
+
+    return overall_retrieval_rate, misclassified_indices, nearest_neighbors_combined
 
 def main():
     VIDEO_FOLDER = 'videos_mae'

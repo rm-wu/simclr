@@ -47,15 +47,17 @@ def show(imgs):
 
 # Data loader for the saved objects
 class ObjectDataset(Dataset):
-    def __init__(self, metadata_file, transform=None):
+    def __init__(self, output_dir, metadata_file, transform=None):
         with open(metadata_file, "rb") as f:
             self.metadata = pickle.load(f)
-        self.transform = transform
+        self.transform  = transform
+        self.output_dir = output_dir
     def __len__(self):
         return len(self.metadata)
     def __getitem__(self, idx):
         entry = self.metadata[idx]
-        img = Image.open(entry["file_path"]).convert("RGB")
+        file_path = os.path.join(self.output_dir, entry["file_path"].split("/")[-1])
+        img = Image.open(file_path).convert("RGB")
         label = entry["label"]
         # Crop the non-zero regions of the image
         img_tensor = T.ToTensor()(img)
@@ -68,13 +70,13 @@ class ObjectDataset(Dataset):
             img_tensor = self.transform(img_tensor)
         return img_tensor, label
 
-def return_dataset(output_dir="mscoco_objects", metadata_file="metadata.pkl", pad=-1):
+def return_dataset(output_dir="ms_coco/ms_coco_objects", metadata_file="metadata.pkl", pad=-1):
     metadata_file = os.path.join(output_dir, metadata_file)
     if pad>0:
         transform = T.Compose([PadToMultipleOf(pad)])
     else:
         transform = None
-    dataset = ObjectDataset(metadata_file, transform=transform)
+    dataset = ObjectDataset(output_dir, metadata_file, transform=transform)
     data_loader = DataLoader(dataset, batch_size=32, shuffle=True)
     return data_loader
 
@@ -90,7 +92,7 @@ for MODEL_NAME in ['CLIP', 'DINOv2-reg', 'MAE']:
         print(len(embeddings))
     embeddings, labels = torch.cat(embeddings), torch.cat(labels)
     print(embeddings.shape, labels.shape)
-    torch.save([embeddings, labels], f'{MODEL_NAME}_embeddings.pt')
+    torch.save([embeddings, labels], f'{MODEL_NAME}_ms_coco_embeddings.pt')
     retrieval_rate, misclassified_idx, _ = compute_knn(embeddings, labels, normalize=False)
     print(f'{MODEL_NAME} retrieval rate: {retrieval_rate} misclassified_idx: {misclassified_idx}')
     retrieval_rate, misclassified_idx = compute_knn(embeddings, labels, normalize=False)

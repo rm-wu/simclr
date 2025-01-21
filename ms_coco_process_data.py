@@ -124,7 +124,7 @@ plt.show()
 # %%
 
 # Create directory for saving images
-output_dir = "ms_coco_objects"
+output_dir = "ms_coco/ms_coco_objects"
 os.makedirs(output_dir, exist_ok=True)
 
 # Initialize transform for resizing and cropping
