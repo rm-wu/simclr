@@ -147,8 +147,8 @@ def save_object(image_tensor, label, obj_idx, img_idx):
         "label": label
     }
 
-# L = len(dataset_val)
-L = 1000
+L = len(dataset_val)
+# L = 1000
 for idx in range(L):
     img, target = dataset_val[idx]
     if len(list(target.keys()))!=5:

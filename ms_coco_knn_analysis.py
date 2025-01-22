@@ -4,6 +4,7 @@ import numpy as np
 import os
 import requests
 import timm
+import json
 import torch
 import pickle
 import torch.nn.functional as F
@@ -46,6 +47,17 @@ def show(imgs):
         img = T.functional.to_pil_image(img)
         axs[0, i].imshow(np.asarray(img))
         axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+
+
+ROOT = '/weka/datasets/coco'
+# ROOT = '/Users/hizlic1/repository-object-centric/ms-coco'
+ANNOTATIONS_PATH = f'{ROOT}/annotations/instances_val2017.json'
+with open(ANNOTATIONS_PATH, 'r') as f:
+    root = json.load(f)
+categ_map = {x['id']: '_'.join(x['name'].split( )) for x in root['categories']}
+for k in categ_map.keys():
+    print(k,'->',categ_map[k], end="\n")
+
 
 # Data loader for the saved objects
 class ObjectDataset(Dataset):
@@ -120,19 +132,19 @@ for n in range(embeddings.shape[0]):
     # if the label is the same as the nearest neighbor, then it is a correct retrieval
     if labels[n] == labels[nns[n,0]]:
         continue
-    if (T.ToTensor()(original_img)!=0).to(torch.float16).mean() < 0.01:
+    if (T.ToTensor()(original_img)!=0).to(torch.float16).mean() < 0.04:
         # print('too small object')
         small_idx += 1
         continue
     try:
         fig, ax = plt.subplots(1, NNcount+1, figsize=(NNcount*2, 2))
         ax[0].imshow(original_img);
-        ax[0].set_title(f'Original {labels[n]}');
+        ax[0].set_title(f'Original {categ_map[labels[n]]}');
         ax[0].axis('off');
         for i in range(NNcount):
             img = Image.open(file_paths[nns[n,i]]).convert("RGB");
             ax[i+1].imshow(img);
-            ax[i+1].set_title(f'NN {i+1} ({labels[nns[n,i]]})');
+            ax[i+1].set_title(f'NN {i+1} ({categ_map[labels[nns[n,i]]]})');
             ax[i+1].axis('off');
         plt.savefig(f'ms_coco/{MODEL_NAME}_NN_{misclass_idx}.png');
         misclass_idx += 1
