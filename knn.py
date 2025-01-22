@@ -45,12 +45,15 @@ def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True, data
 
     for start in range(0, num_embeddings, batch_size):
         end = min(start + batch_size, num_embeddings)
-        current_embeddings = all_embeddings[start:end] # batch_size,q
+        current_idx = torch.arange(start, end).to(all_embeddings.device)
+        current_embeddings = all_embeddings[current_idx] # batch_size,q
         similarity = torch.zeros(current_embeddings.shape[0], retrieval_set_size, device=all_embeddings.device)
         if data_portion==1.0:
             retrieval_set_idx = torch.arange(num_embeddings).to(all_embeddings.device)
         else:
             retrieval_set_idx = torch.randperm(num_embeddings)[:retrieval_set_size].to(all_embeddings.device)
+            # compute a binary matrix denoting if the elements in retrieval_set_idx are the same as start:end
+             
         retrieval_set = all_embeddings[retrieval_set_idx]
 
         # Compute similarity for current batchprint(start)
@@ -58,10 +61,12 @@ def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True, data
             last_idx = min(i + batch_size, retrieval_set_size)
             similarity[:, i:last_idx] = (current_embeddings.unsqueeze(1) * retrieval_set[i:last_idx].unsqueeze(0)).sum(-1)
 
-        # Set diagonal elements to a large negative value for the current batch
-        if data_portion >= 1.0:
-            for i in range(end - start):
-                similarity[i, start + i] = -1e0
+        # avoid selecting the same element as the nearest neighbor
+        current_idx = current_idx.unsqueeze(1).expand(-1, retrieval_set_size)
+        similarity[current_idx == retrieval_set_idx] = -1e0
+        # if data_portion >= 1.0:
+        #     for i in range(end - start):
+        #         similarity[i, start + i] = -1e0
 
         # Get top-5 nearest neighbors for the current batch
         _, nearest_neighbors = similarity.topk(5, dim=1)
