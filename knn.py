@@ -56,7 +56,7 @@ def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True, data
             similarity[:, i:last_idx] = (current_embeddings.unsqueeze(1) * retrieval_set[i:last_idx].unsqueeze(0)).sum(-1)
 
         # Set diagonal elements to a large negative value for the current batch
-        if data_portion < 1.0:
+        if data_portion >= 1.0:
             for i in range(end - start):
                 similarity[i, start + i] = -1e0
 
