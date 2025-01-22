@@ -46,7 +46,7 @@ def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True, data
     for start in range(0, num_embeddings, batch_size):
         end = min(start + batch_size, num_embeddings)
         current_embeddings = all_embeddings[start:end] # batch_size,q
-        similarity = torch.zeros(current_embeddings.shape[0], num_embeddings, device=all_embeddings.device)
+        similarity = torch.zeros(current_embeddings.shape[0], retrieval_set_size, device=all_embeddings.device)
         if data_portion==1.0:
             retrieval_set_idx = torch.arange(num_embeddings).to(all_embeddings.device)
         else:

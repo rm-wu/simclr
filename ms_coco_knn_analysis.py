@@ -124,7 +124,7 @@ for MODEL_NAME in MODELS:
         retrieval_rate, misclassified_idx, nns = compute_knn(embeddings, labels, normalize=False, data_portion=ratio)
         print(f'{MODEL_NAME}, ratio: {ratio}, retrieval rate: {retrieval_rate} accuracy: {1-len(misclassified_idx)/embeddings.shape[0]}')
         retrieval_rate, misclassified_idx, nns = compute_knn(embeddings, labels, normalize=True, data_portion=ratio)
-        print(f'{MODEL_NAME}, ratio: {ratio} (normalized) retrieval rate: {retrieval_rate} accuracy: {1-len(misclassified_idx)/embeddings.shape[0]}')
+        print(f'{MODEL_NAME}, ratio: {ratio}py (normalized) retrieval rate: {retrieval_rate} accuracy: {1-len(misclassified_idx)/embeddings.shape[0]}')
 
 # for the first n images, plot the image and nearest neighbors
 misclass_idx, small_idx = 0,0
