@@ -32,11 +32,12 @@ from plot_utils     import visualize_traj
 #     misclassified_idx = [i for i in range(similarity.shape[0]) if all_labels[i]!=all_labels[nearest_neighbors[i,0]]]
     # return retrieval_rate, misclassified_idx, nearest_neighbors
 
-def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True):
+def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True, data_portion=1.0):
     if normalize:
         all_embeddings = F.normalize(all_embeddings, dim=-1)
     
     num_embeddings = all_embeddings.shape[0]
+    retrieval_set_size = int(num_embeddings * data_portion)
     
     nearest_neighbors_list = []
     retrieval_rates = []
@@ -46,18 +47,22 @@ def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True):
         end = min(start + batch_size, num_embeddings)
         current_embeddings = all_embeddings[start:end] # batch_size,q
         similarity = torch.zeros(current_embeddings.shape[0], num_embeddings, device=all_embeddings.device)
+        retrieval_set_idx = torch.randperm(num_embeddings)[:retrieval_set_size]
+        retrieval_set = all_embeddings[retrieval_set_idx]
 
         # Compute similarity for current batchprint(start)
-        for i in range(0, num_embeddings, batch_size):
-            last_idx = min(i + batch_size, num_embeddings)
-            similarity[:, i:last_idx] = (current_embeddings.unsqueeze(1) * all_embeddings[i:last_idx].unsqueeze(0)).sum(-1)
+        for i in range(0, retrieval_set_size, batch_size):
+            last_idx = min(i + batch_size, retrieval_set_size)
+            similarity[:, i:last_idx] = (current_embeddings.unsqueeze(1) * retrieval_set[i:last_idx].unsqueeze(0)).sum(-1)
 
         # Set diagonal elements to a large negative value for the current batch
-        for i in range(end - start):
-            similarity[i, start + i] = -1e0
+        if data_portion < 1.0:
+            for i in range(end - start):
+                similarity[i, start + i] = -1e0
 
         # Get top-5 nearest neighbors for the current batch
         _, nearest_neighbors = similarity.topk(5, dim=1)
+        nearest_neighbors = retrieval_set_idx[nearest_neighbors]
         nearest_neighbors_list.append(nearest_neighbors)
 
         # Compute retrieval rate for the current batch
