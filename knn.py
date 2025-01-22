@@ -57,8 +57,8 @@ def compute_knn(all_embeddings, all_labels, batch_size=256, normalize=True):
             similarity[i, start + i] = -1e0
 
         # Get top-5 nearest neighbors for the current batch
-        _, nearest_neighbors = similarity[:end - start].topk(5, dim=1)
-        nearest_neighbors_list.append(nearest_neighbors + start)
+        _, nearest_neighbors = similarity.topk(5, dim=1)
+        nearest_neighbors_list.append(nearest_neighbors)
 
         # Compute retrieval rate for the current batch
         retrieval_rate_batch = torch.stack([
