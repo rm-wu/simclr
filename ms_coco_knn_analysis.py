@@ -101,6 +101,7 @@ invTrans = T.Compose([ T.Normalize(mean = [ 0., 0., 0. ], std = [ 1/0.229, 1/0.2
                                     T.Normalize(mean = [ -0.485, -0.456, -0.406 ], std = [ 1., 1., 1. ]),])
 
 MODELS = ['DINOv2-reg']
+ratios = [1/64, 1/32, 1/16, 1/8, 1/4, 1/2, 1]
 for MODEL_NAME in MODELS:
     # if embeddings are already computed, load them
     fname = os.path.join('ms_coco', f'{MODEL_NAME}_ms_coco_embeddings.pt')
@@ -119,10 +120,11 @@ for MODEL_NAME in MODELS:
         embeddings, labels = torch.cat(embeddings), torch.cat(labels)
         torch.save([embeddings, labels, file_paths], fname)
     print(embeddings.shape, labels.shape)
-    retrieval_rate, misclassified_idx, nns = compute_knn(embeddings, labels, normalize=False, data_portion=1/32)
-    print(f'{MODEL_NAME} retrieval rate: {retrieval_rate} accuracy: {1-len(misclassified_idx)/embeddings.shape[0]}')
-    retrieval_rate, misclassified_idx, nns = compute_knn(embeddings, labels, normalize=True, data_portion=1/32)
-    print(f'{MODEL_NAME} (normalized) retrieval rate: {retrieval_rate} accuracy: {1-len(misclassified_idx)/embeddings.shape[0]}')
+    for ratio in ratios:
+        retrieval_rate, misclassified_idx, nns = compute_knn(embeddings, labels, normalize=False, data_portion=ratio)
+        print(f'{MODEL_NAME}, ratio: {ratio}, retrieval rate: {retrieval_rate} accuracy: {1-len(misclassified_idx)/embeddings.shape[0]}')
+        retrieval_rate, misclassified_idx, nns = compute_knn(embeddings, labels, normalize=True, data_portion=ratio)
+        print(f'{MODEL_NAME}, ratio: {ratio} (normalized) retrieval rate: {retrieval_rate} accuracy: {1-len(misclassified_idx)/embeddings.shape[0]}')
 
 # for the first n images, plot the image and nearest neighbors
 misclass_idx, small_idx = 0,0
