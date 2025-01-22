@@ -117,7 +117,6 @@ misclass_idx, small_idx = 0,0
 NNcount = nns.shape[1]
 for n in range(embeddings.shape[0]):
     original_img = Image.open(file_paths[n]).convert("RGB");
-    fig, ax = plt.subplots(1, NNcount+1, figsize=(NNcount*2, 2))
     # if the label is the same as the nearest neighbor, then it is a correct retrieval
     if labels[n] == labels[nns[n,0]]:
         continue
@@ -126,6 +125,7 @@ for n in range(embeddings.shape[0]):
         small_idx += 1
         continue
     try:
+        fig, ax = plt.subplots(1, NNcount+1, figsize=(NNcount*2, 2))
         ax[0].imshow(original_img);
         ax[0].set_title(f'Original {labels[n]}');
         ax[0].axis('off');
