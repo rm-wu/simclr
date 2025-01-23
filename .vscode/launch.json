@@ -26,6 +26,23 @@
                 "--out-dir=/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/outputs/debug/"
             ]
         },
+        {
+            "name": "linear eval",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/dense_prediction/open-hummingbird-eval/linear_eval.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--model=dinov2_vits14",
+                "--input-size=504",
+                "--patch-size=14",
+                "--embeddings-size=384",
+                "--dataset-name=voc",
+                "--data-dir=/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data",
+                "--out-dir=/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/outputs/debug/"
+            ]
+        },
 
         {
             "name": "train.py",
