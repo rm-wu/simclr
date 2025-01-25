@@ -250,7 +250,7 @@ def ls_finetune(
         print()
 
         # Validation Step
-        if epoch % 5 == 0:
+        if epoch % 5 == 0 or epoch == max_epochs - 1:
             miou_metric = PredsmIoU(num_classes, num_classes)
             val_losses = []
             with torch.no_grad():
