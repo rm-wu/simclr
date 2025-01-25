@@ -18,7 +18,8 @@ import random
 import os
 from typing import Callable
 import einops as ein
-from tqdm import tqdm
+from tqdm import tqdm, trange
+import numpy as np
 
 from src.voc_data import VOCDataModule
 from src.ade20kdata import Ade20kDataModule
@@ -219,9 +220,10 @@ def ls_finetune(
     num_classes = data_module.get_num_classes()
     train_loader = data_module.train_dataloader()
     val_loader = data_module.val_dataloader()
+    train_losses = []
     
-    iterator = tqdm(train_loader)
-    for epoch in range(max_epochs):
+    for epoch in trange(max_epochs, ncols=80):
+        iterator = tqdm(train_loader, ncols=80)
         for batch in iterator:
             images, masks = batch
             images = images.to(device)
@@ -263,7 +265,13 @@ def ls_finetune(
             optimizer.step()
             # print(f"loss : {loss.item()}")
             iterator.set_postfix(loss=loss.item())
-        scheduler.step()    
+            train_losses.append(loss.item())
+        scheduler.step()
+        print()
+        print(f"mean loss : {np.mean(train_losses)}")
+        print(f"lr : {optimizer.param_groups[0]['lr']}")
+        print()
+            
     # model = LinearFinetune(
     #     patch_size=patch_size,
     #     head_type=head_type,
