@@ -9,6 +9,7 @@ if __name__ == "__main__":
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
+from pathlib import Path
 
 import faiss
 
@@ -54,6 +55,8 @@ class HbirdEvaluation:
         f_mem_p=None,
         l_mem_p=None,
         use_faiss: bool = True,
+        out_dir: str = None,
+        save_features: bool = False,
     ):
         if nn_params is None:
             nn_params = {}
@@ -69,7 +72,8 @@ class HbirdEvaluation:
         self.num_sampled_features = None
         self.f_mem_p = f_mem_p
         self.l_mem_p = l_mem_p
-
+        self.save_features = save_features
+        self.out_dir = out_dir
         if self.memory_size is not None:
             #
             n_patches = eval_spatial_resolution**2
@@ -102,37 +106,33 @@ class HbirdEvaluation:
             self.use_faiss = False
             self.create_NN(self.n_neighbours, **nn_params)
 
-
-
     # import torch
     def create_NN_faiss(
-            self,
-            n_neighbours=30,
-            distance_measure="dot_product",
-            use_gpu=True,
-        ):
-            # Convert feature memory to a NumPy array
-            feature_memory_np = self.feature_memory.detach().cpu().numpy()
-            d = feature_memory_np.shape[1]  # Get feature dimension
+        self,
+        n_neighbours=30,
+        distance_measure="dot_product",
+        use_gpu=True,
+    ):
+        # Convert feature memory to a NumPy array
+        feature_memory_np = self.feature_memory.detach().cpu().numpy()
+        d = feature_memory_np.shape[1]  # Get feature dimension
 
-            # FAISS requires an index type; we use Inner Product for dot-product similarity
-            if distance_measure == "dot_product":
-                index = faiss.IndexFlatIP(d)  # FAISS uses Inner Product for similarity
-            else:
-                index = faiss.IndexFlatL2(d)  # Default to L2 if unspecified
+        # FAISS requires an index type; we use Inner Product for dot-product similarity
+        if distance_measure == "dot_product":
+            index = faiss.IndexFlatIP(d)  # FAISS uses Inner Product for similarity
+        else:
+            index = faiss.IndexFlatL2(d)  # Default to L2 if unspecified
 
-            # Move index to GPU if available and requested
-            if use_gpu and faiss.get_num_gpus() > 0:
-                res = faiss.StandardGpuResources()
-                index = faiss.index_cpu_to_gpu(res, 0, index)
+        # Move index to GPU if available and requested
+        if use_gpu and faiss.get_num_gpus() > 0:
+            res = faiss.StandardGpuResources()
+            index = faiss.index_cpu_to_gpu(res, 0, index)
 
-            # Add data to the index
-            index.add(feature_memory_np)
+        # Add data to the index
+        index.add(feature_memory_np)
 
-            # Store the index as a class attribute
-            self.NN_algorithm = index
-
-
+        # Store the index as a class attribute
+        self.NN_algorithm = index
 
     def create_NN(
         self,
@@ -144,10 +144,6 @@ class HbirdEvaluation:
         num_reordering_candidates=120,
         dimensions_per_block=4,
     ):
-       
-        # Enable multi-threading
-        os.environ["SCANN_NUM_THREADS"] = "64"
-
         self.NN_algorithm = (
             scann.scann_ops_pybind.builder(
                 self.feature_memory.detach().cpu().numpy(),
@@ -193,6 +189,9 @@ class HbirdEvaluation:
                         patchified_gts, num_classes=num_classes
                     ).float()
                     label = one_hot_patch_gt.mean(dim=3)
+                    # this lines creates a probability distribution over the
+                    # number of classes for each patch. If all pixels in a patch
+                    # belong to the same class, the probability for that class is 1.
                     if self.memory_size is None:
                         # Memory Size is unbounded so we store all the features
                         normalized_features = features / torch.norm(
@@ -242,6 +241,18 @@ class HbirdEvaluation:
             torch.save(self.feature_memory.cpu(), self.f_mem_p)
         if self.l_mem_p is not None:
             torch.save(self.label_memory.cpu(), self.l_mem_p)
+
+        if self.save_features and self.f_mem_p is None and self.l_mem_p is None:
+            out_dir = Path(self.out_dir)
+            if not out_dir.exists():
+                out_dir.mkdir(parents=True, exist_ok=True)
+            print(f"feature memory: {self.feature_memory.shape}")
+            print(f"label memory: {self.label_memory.shape}")
+            self.f_mem_p = os.path.join(self.out_dir, "feature_memory.pt")
+            self.l_mem_p = os.path.join(self.out_dir, "label_memory.pt")
+            torch.save(self.feature_memory.cpu(), self.f_mem_p)
+            torch.save(self.label_memory.cpu(), self.l_mem_p)
+            print(f"Saved feature memory and label memory to {self.out_dir}")
 
     def load_memory(self):
         if (
@@ -351,21 +362,21 @@ class HbirdEvaluation:
         key_labels = self.label_memory[neighbors]
         key_labels = key_labels.reshape(bs, num_patches, self.n_neighbours, -1)
         return key_features, key_labels
-    
+
     def find_nearest_key_to_query_faiss(self, q):
         bs, num_patches, d_k = q.shape  # Extract batch size, patches, and feature dim
         query_np = q.reshape(bs * num_patches, d_k)  # Flatten queries
 
         # Convert to NumPy for FAISS search
         # query_np = reshaped_q.detach().cpu().numpy()
-        
+
         # Perform FAISS search for nearest neighbors
         distances, neighbors = self.NN_algorithm.search(query_np, self.n_neighbours)
-        
+
         # Convert results back to torch tensors
         neighbors = torch.from_numpy(neighbors.astype(np.int64)).to(self.device)
         neighbors = neighbors.flatten()  # Flatten for indexing
-        
+
         # Retrieve key features from memory
         key_features = self.feature_memory[neighbors]
         key_features = key_features.reshape(bs, num_patches, self.n_neighbours, -1)
@@ -461,6 +472,8 @@ def hbird_evaluation(
     ftr_extr_fn=None,
     memory_size=None,
     num_workers=8,
+    use_faiss=False,
+    save_features=False,
     ignore_index=255,
 ):
     eval_spatial_resolution = input_size // patch_size
@@ -538,6 +551,8 @@ def hbird_evaluation(
         dataset_size=dataset_size,
         f_mem_p=f_mem_p,
         l_mem_p=l_mem_p,
+        save_features=save_features,
+        out_dir=out_dir,
     )
     return evaluator.evaluate(
         val_loader, eval_spatial_resolution, return_knn_details=return_knn_details

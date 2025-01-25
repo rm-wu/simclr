@@ -7,6 +7,9 @@ import numpy as np
 from src.hbird_eval import hbird_evaluation
 from src.ibot_vision_transformer import get_ibot_model_by_name
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")
+
 
 def main(args):
     print(f"the script arguments are {args}")
@@ -63,7 +66,9 @@ def main(args):
         # Path to the dataset to use for evaluation
         data_dir=args.data_dir,
         out_dir=out_dir,
-        num_workers=64,
+        num_workers=args.num_workers,
+        use_faiss=args.use_faiss,
+        save_features=args.save_features,
         memory_size=args.memory_size if args.memory_size > -1 else None,
     )
     np.save(os.path.join(out_dir, "hbird_miou.npy"), np.array([hbird_miou]))
@@ -93,11 +98,12 @@ if __name__ == "__main__":
     parser.add_argument("--memory-size", type=int, default=None, help="The size of the memory bank. Unbounded if not specified")
     parser.add_argument("--model", type=str, required=True, help="DINO model name")
     parser.add_argument("--embeddings-size", type=int, required=True, help="The size of the model embeddings")
-
+    parser.add_argument("--use-faiss", action="store_true", help="Whether to use faiss for the k-NN operator")
     # Data arguments
     parser.add_argument("--data-dir", type=str, default="VOCSegmentation", help="Path to the VOC dataset")
     parser.add_argument("--out-dir", type=str, default="out-cribo", help="Path to the output directory")
-
+    parser.add_argument("--num-workers", type=int, default=64, help="Number of workers for the dataloader")
+    parser.add_argument("--save-features", action="store_true", help="Whether to save the features and labels to the output directory")
     args = parser.parse_args()
 
     seed_everything(args.seed)
