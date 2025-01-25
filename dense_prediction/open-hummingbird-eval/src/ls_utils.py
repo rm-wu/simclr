@@ -81,7 +81,7 @@ class PredsmIoU(Metric):
         if self.num_pred_classes == self.num_gt_classes.
         """
         assert pred.shape == gt.shape
-        print(f"seg map preds have size {gt.shape}")
+        # print(f"seg map preds have size {gt.shape}")
         tp = [0] * num_gt
         fp = [0] * num_gt
         fn = [0] * num_gt
@@ -122,7 +122,7 @@ class PredsmIoU(Metric):
         for i_part in range(0, num_gt):
             jac[i_part] = float(tp[i_part]) / max(float(tp[i_part] + fp[i_part] + fn[i_part]), 1e-8)
 
-        print("IoUs computed")
+        # print("IoUs computed")
         return np.mean(jac), tp, fp, fn, reordered_preds.astype(int).tolist(), matched_bg_clusters
 
     @staticmethod

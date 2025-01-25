@@ -250,52 +250,52 @@ def ls_finetune(
         print()
 
         # Validation Step
+        if epoch % 5 == 0:
+            miou_metric = PredsmIoU(num_classes, num_classes)
+            val_losses = []
+            with torch.no_grad():
+                for batch in val_loader:
+                    images, masks = batch
+                    images = images.to(device)
+                    masks = masks.to(device)
 
-        miou_metric = PredsmIoU(num_classes, num_classes)
-        val_losses = []
-        with torch.no_grad():
-            for batch in val_loader:
-                images, masks = batch
-                images = images.to(device)
-                masks = masks.to(device)
+                    tokens, _ = feat_extr_fn(backbone, images)
+                    tokens = ein.rearrange(
+                        tokens, "b (h w) d -> b d h w", h=spatial_res, w=spatial_res
+                    )
+                    tokens = nn.functional.interpolate(
+                        tokens, size=(val_mask_size, val_mask_size), mode="bilinear"
+                    )
+                    masks_l = masks * 255
+                    if train_mask_size != input_size:
+                        with torch.no_grad():
+                            masks_l = nn.functional.interpolate(
+                                masks_l,
+                                size=(train_mask_size, train_mask_size),
+                                mode="nearest",
+                            )
+                            masks_l[masks_l == ignore_index] = 0
 
-                tokens, _ = feat_extr_fn(backbone, images)
-                tokens = ein.rearrange(
-                    tokens, "b (h w) d -> b d h w", h=spatial_res, w=spatial_res
-                )
-                tokens = nn.functional.interpolate(
-                    tokens, size=(val_mask_size, val_mask_size), mode="bilinear"
-                )
-                masks_l = masks * 255
-                if train_mask_size != input_size:
-                    with torch.no_grad():
-                        masks_l = nn.functional.interpolate(
-                            masks_l,
-                            size=(train_mask_size, train_mask_size),
-                            mode="nearest",
-                        )
-                        masks_l[masks_l == ignore_index] = 0
+                    outputs = linear_head(tokens)
+                    val_loss = nn.CrossEntropyLoss()(outputs, masks_l.long().squeeze())
+                    val_losses.append(val_loss.item())
 
-                outputs = linear_head(tokens)
-                val_loss = nn.CrossEntropyLoss()(outputs, masks_l.long().squeeze())
-                val_losses.append(val_loss.item())
+                    # downsample masks and preds
+                    gt = masks * 255
+                    gt = nn.functional.interpolate(
+                        gt, size=(val_mask_size, val_mask_size), mode="nearest"
+                    )
+                    valid = gt != ignore_index  # mask to remove object boundary class
+                    mask_preds = torch.argmax(outputs, dim=1).unsqueeze(1)
 
-                # downsample masks and preds
-                gt = masks * 255
-                gt = nn.functional.interpolate(
-                    gt, size=(val_mask_size, val_mask_size), mode="nearest"
-                )
-                valid = gt != ignore_index  # mask to remove object boundary class
-                mask_preds = torch.argmax(outputs, dim=1).unsqueeze(1)
+                    # update metric
+                    miou_metric.update(gt[valid], mask_preds[valid])
 
-                # update metric
-                miou_metric.update(gt[valid], mask_preds[valid])
-
-            print(f"mean val loss : {np.mean(val_losses)}")
-            miou = miou_metric.compute(True, many_to_one=False, linear_probe=True)[0]
-            miou_metric.reset()
-            print(f"miou : {miou}")
-            print()
+                print(f"mean val loss : {np.mean(val_losses)}")
+                miou = miou_metric.compute(True, many_to_one=False, linear_probe=True)[0]
+                miou_metric.reset()
+                print(f"miou : {miou}")
+                print()
 
     # model = LinearFinetune(
     #     patch_size=patch_size,
