@@ -23,13 +23,8 @@ import numpy as np
 
 from src.voc_data import VOCDataModule
 from src.ade20kdata import Ade20kDataModule
+from src.ls_utils import PredsmIoU
 
-from src.image_transformations import (
-    # Compose,
-    # RandomResizedCrop,
-    # RandomHorizontalFlip,
-    Resize,
-)
 from src.ls_transforms import (
     SepTransforms,
     Compose,
@@ -38,6 +33,7 @@ from src.ls_transforms import (
     RandomResizedCrop,
     RandomHorizontalFlip,
     RandomResizedCrop,
+    Resize,
 )
 from src.image_transformations import CombTransforms
 
@@ -111,23 +107,32 @@ def ls_finetune(
             T.ToTensor(),
         ]
     )
-    train_transforms = CombTransforms(
-        img_transform=img_train_transforms,
-        tgt_transform=None,
-        img_tgt_transform=shared_train_transform,
+    val_transforms = Compose(
+        [
+            Resize((input_size, input_size)),
+            ToTensor(),
+            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
     )
-    val_transforms = CombTransforms(
-        img_transform=img_val_transforms,
-        tgt_transform=None,
-        img_tgt_transform=shared_val_transform,
-    )
-    # from PIL import Image
-    # img = Image.open(
-    #     "/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data/VOCSegmentation/images/2007_000032.jpg"
-    # ).convert("RGB")
-    # mask = Image.open(
-    #     "/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data/VOCSegmentation/SegmentationClassAug/2007_000032.png"
+
+    # train_transforms = CombTransforms(
+    #     img_transform=img_train_transforms,
+    #     tgt_transform=None,
+    #     img_tgt_transform=shared_train_transform,
     # )
+    # val_transforms = CombTransforms(
+    #     img_transform=img_val_transforms,
+    #     tgt_transform=None,
+    #     img_tgt_transform=shared_val_transform,
+    # )
+
+    from PIL import Image
+    img = Image.open(
+        "/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data/VOCSegmentation/images/2007_000032.jpg"
+    ).convert("RGB")
+    mask = Image.open(
+        "/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data/VOCSegmentation/SegmentationClassAug/2007_000032.png"
+    )
     train_transforms = Compose(
         [
             RandomResizedCrop(size=input_size, scale=(0.8, 1.0)),
@@ -135,7 +140,7 @@ def ls_finetune(
             ToTensor(),
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
-    ) # (img, mask)
+    )  # (img, mask)
     # img, mask = train_transforms(img, mask)
     # print(img.shape, mask.shape)
 
@@ -151,8 +156,9 @@ def ls_finetune(
             data_dir=data_dir,
             train_image_transform=train_transforms,
             drop_last=True,
-            val_image_transform=val_transforms,
-            val_target_transform=val_target_transforms,
+            # val_image_transform=val_transforms,
+            # val_target_transform=None,
+            val_transforms=val_transforms,
         )
     # TODO: This part is missing since the open-hummingbird-eval does not support
     # COCO. But it should be possible to integrate that from NeCo repository maybe.
@@ -182,24 +188,24 @@ def ls_finetune(
     #                                  train_transforms=train_transforms,
     #                                  val_transforms=val_image_transforms,
     #                                  val_target_transforms=val_target_transforms)
-    elif dataset_name == "ade20k":
-        # TODO: Evaluate its correctness
-        num_classes = 151
-        ignore_index = 0
-        val_transforms = SepTransforms(val_image_transforms, val_target_transforms)
-        data_module = Ade20kDataModule(
-            data_dir,
-            train_transforms=train_transforms,
-            val_transforms=val_transforms,
-            shuffle=False,
-            num_workers=num_workers,
-            batch_size=batch_size,
-        )
+    # elif dataset_name == "ade20k":
+    #     # TODO: Evaluate its correctness
+    #     num_classes = 151
+    #     ignore_index = 0
+    #     val_transforms = SepTransforms(val_image_transforms, val_target_transforms)
+    #     data_module = Ade20kDataModule(
+    #         data_dir,
+    #         train_transforms=train_transforms,
+    #         val_transforms=val_transforms,
+    #         shuffle=False,
+    #         num_workers=num_workers,
+    #         batch_size=batch_size,
+    #     )
     else:
         raise ValueError(f"{dataset_name} not supported")
 
     # Init Method
-   
+
     assert (input_size / patch_size).is_integer()
     spatial_res = int(input_size // patch_size)
 
@@ -221,7 +227,7 @@ def ls_finetune(
     train_loader = data_module.train_dataloader()
     val_loader = data_module.val_dataloader()
     train_losses = []
-    
+
     for epoch in trange(max_epochs, ncols=80):
         iterator = tqdm(train_loader, ncols=80)
         for batch in iterator:
@@ -243,11 +249,13 @@ def ls_finetune(
                     tokens, size=(train_mask_size, train_mask_size), mode="bilinear"
                 )
                 # print(f"{tokens.shape}")
-                
+
                 # TODO: this part needs to be revised
                 # print(f"m1 : {masks.shape}")
-                masks = T.Resize((train_mask_size, train_mask_size), 
-                             interpolation=InterpolationMode.NEAREST)(masks)
+                masks = T.Resize(
+                    (train_mask_size, train_mask_size),
+                    interpolation=InterpolationMode.NEAREST,
+                )(masks)
                 # print(f"m2 : {masks.shape}")
 
             # with torch.no_grad():
@@ -271,7 +279,49 @@ def ls_finetune(
         print(f"mean loss : {np.mean(train_losses)}")
         print(f"lr : {optimizer.param_groups[0]['lr']}")
         print()
-            
+
+        # Validation Step
+
+        miou_metric = PredsmIoU(num_classes, num_classes)
+        val_losses = []
+        with torch.no_grad():
+            for batch in val_loader:
+                images, masks = batch
+                images = images.to(device)
+                masks = masks.to(device)
+
+                tokens, _ = feat_extr_fn(backbone, images)
+                tokens = ein.rearrange(
+                    tokens, "b (h w) d -> b d h w", h=spatial_res, w=spatial_res
+                )
+                tokens = nn.functional.interpolate(
+                    tokens, size=(val_mask_size, val_mask_size), mode="bilinear"
+                )
+                masks_l = T.Resize((val_mask_size, val_mask_size),
+                                 interpolation=InterpolationMode.NEAREST)(masks)
+
+                outputs = linear_head(tokens)
+                val_loss = nn.CrossEntropyLoss()(outputs, masks_l.long().squeeze())
+                # print(f"val loss : {val_loss.item()}")
+                val_losses.append(val_loss.item())
+
+                # downsample masks and preds
+                gt = masks * 255
+                gt = nn.functional.interpolate(
+                    gt, size=(val_mask_size, val_mask_size), mode="nearest"
+                )
+                valid = gt != ignore_index  # mask to remove object boundary class
+                mask_preds = torch.argmax(outputs, dim=1).unsqueeze(1)
+
+                # update metric
+                miou_metric.update(gt[valid], mask_preds[valid])
+            # print()
+            print(f"mean val loss : {np.mean(val_losses)}")
+            miou = miou_metric.compute(True, many_to_one=False, linear_probe=True)[0]
+            miou_metric.reset()
+            print(f"miou : {miou}")
+            print()
+
     # model = LinearFinetune(
     #     patch_size=patch_size,
     #     head_type=head_type,

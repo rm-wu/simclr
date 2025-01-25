@@ -1,6 +1,8 @@
 import random
+import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
+from PIL import Image
 
 
 class RandomHorizontalFlip(object):
@@ -70,3 +72,21 @@ class SepTransforms(object):
         if self.tgt_transform:
             tgt = self.tgt_transform(tgt)
         return img, tgt
+
+
+
+
+def resize(image, target, size=(256, 256)):
+    ## convert target to tensor
+    # if not isinstance(target, torch.Tensor):
+    #     target = T.ToTensor()(target)
+    image = F.resize(image, size, interpolation=Image.BILINEAR)
+    target = F.resize(target, size, interpolation=Image.NEAREST)
+    return image, target
+
+class Resize(object):
+    def __init__(self, size):
+        self.size = size
+    
+    def __call__(self, img, target):
+        return resize(img, target, self.size)
