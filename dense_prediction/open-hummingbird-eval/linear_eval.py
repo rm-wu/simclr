@@ -6,7 +6,7 @@ from pathlib import Path
 from eval import seed_everything
 from src.ibot_vision_transformer import get_ibot_model_by_name
 from src.linear_eval import ls_finetune
-from src.image_transformations import Compose, RandomResizedCrop, RandomHorizontalFlip, Resize
+
 
 
 def main(args):
@@ -60,6 +60,7 @@ def main(args):
         input_size=args.input_size,
         train_mask_size=100,
         val_mask_size=100,
+        device=device,
     )
 
 

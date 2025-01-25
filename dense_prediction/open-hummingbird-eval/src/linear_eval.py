@@ -23,8 +23,21 @@ from tqdm import tqdm
 from src.voc_data import VOCDataModule
 from src.ade20kdata import Ade20kDataModule
 
-from src.image_transformations import Compose, RandomResizedCrop, RandomHorizontalFlip, Resize
-from src.ls_transforms import SepTransforms
+from src.image_transformations import (
+    # Compose,
+    # RandomResizedCrop,
+    # RandomHorizontalFlip,
+    Resize,
+)
+from src.ls_transforms import (
+    SepTransforms,
+    Compose,
+    Normalize,
+    ToTensor,
+    RandomResizedCrop,
+    RandomHorizontalFlip,
+    RandomResizedCrop,
+)
 from src.image_transformations import CombTransforms
 
 
@@ -64,15 +77,16 @@ def ls_finetune(
     input_size: int = 448,
     train_mask_size: int = 100,
     val_mask_size: int = 100,
+    device: torch.device = torch.device("cuda"),
 ):
     # TODO: These hyperparameters should be checked with the original code
     # input_size = args.input_size # 448
     # train_mask_size = 100
     # val_mask_size = 100
 
-    img_train_transforms = Compose(
+    img_train_transforms = T.Compose(
         [
-            RandomHorizontalFlip(p=0.5),
+            T.RandomHorizontalFlip(p=0.5),
             T.ToTensor(),
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
@@ -84,15 +98,15 @@ def ls_finetune(
     img_val_transforms = T.Normalize(
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
     )
-    shared_val_transform = Compose(
+    shared_val_transform = T.Compose(
         [
             Resize((input_size, input_size)),
             T.ToTensor(),
         ]
     )
-    val_target_transforms = Compose(
+    val_target_transforms = T.Compose(
         [
-            Resize((input_size, input_size), interpolation=InterpolationMode.NEAREST),
+            T.Resize((input_size, input_size), interpolation=InterpolationMode.NEAREST),
             T.ToTensor(),
         ]
     )
@@ -106,6 +120,23 @@ def ls_finetune(
         tgt_transform=None,
         img_tgt_transform=shared_val_transform,
     )
+    # from PIL import Image
+    # img = Image.open(
+    #     "/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data/VOCSegmentation/images/2007_000032.jpg"
+    # ).convert("RGB")
+    # mask = Image.open(
+    #     "/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data/VOCSegmentation/SegmentationClassAug/2007_000032.png"
+    # )
+    train_transforms = Compose(
+        [
+            RandomResizedCrop(size=input_size, scale=(0.8, 1.0)),
+            RandomHorizontalFlip(p=0.5),
+            ToTensor(),
+            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    ) # (img, mask)
+    # img, mask = train_transforms(img, mask)
+    # print(img.shape, mask.shape)
 
     if dataset_name == "voc":
         num_classes = 21
@@ -167,10 +198,11 @@ def ls_finetune(
         raise ValueError(f"{dataset_name} not supported")
 
     # Init Method
-    spatial_res = input_size / patch_size
-    assert spatial_res.is_integer()
+   
+    assert (input_size / patch_size).is_integer()
+    spatial_res = int(input_size // patch_size)
 
-    linear_head = nn.Conv2d(backbone.embed_dim, num_classes, 1)
+    linear_head = nn.Conv2d(backbone.embed_dim, num_classes, 1).to(device)
 
     # freeze all layers of backbone
     for param in backbone.parameters():
@@ -187,28 +219,51 @@ def ls_finetune(
     num_classes = data_module.get_num_classes()
     train_loader = data_module.train_dataloader()
     val_loader = data_module.val_dataloader()
-
+    
+    iterator = tqdm(train_loader)
     for epoch in range(max_epochs):
-        for batch in tqdm(train_loader):
+        for batch in iterator:
             images, masks = batch
+            images = images.to(device)
+            masks = masks.to(device)
             B, C, H, W = images.shape
             assert H == W == input_size
 
             with torch.no_grad():
-                tokens = feat_extr_fn(backbone, images)
+                tokens, _ = feat_extr_fn(backbone, images)
+                # print(f"{tokens.shape}")
                 tokens = ein.rearrange(
                     tokens, "b (h w) d -> b d h w", h=spatial_res, w=spatial_res
                 )
+                # print(f"{tokens.shape}")
+                # print(f"{train_mask_size} {type(train_mask_size)}")
                 tokens = nn.functional.interpolate(
                     tokens, size=(train_mask_size, train_mask_size), mode="bilinear"
                 )
+                # print(f"{tokens.shape}")
+                
+                # TODO: this part needs to be revised
+                # print(f"m1 : {masks.shape}")
+                masks = T.Resize((train_mask_size, train_mask_size), 
+                             interpolation=InterpolationMode.NEAREST)(masks)
+                # print(f"m2 : {masks.shape}")
+
+            # with torch.no_grad():
+            #     tokens = self.model.forward_backbone(imgs)
+            #     if 'vit' in self.arch:
+            #         tokens = tokens[:, 1:].reshape(bs, self.spatial_res, self.spatial_res, self.model.embed_dim).\
+            #             permute(0, 3, 1, 2)
+            #     tokens = nn.functional.interpolate(tokens, size=(self.train_mask_size, self.train_mask_size),
+            #                                        mode='bilinear')
 
             optimizer.zero_grad()
-            outputs = linear_head(images)
+            outputs = linear_head(tokens)
             loss = nn.CrossEntropyLoss()(outputs, masks.long().squeeze())
             loss.backward()
             optimizer.step()
-            scheduler.step()
+            # print(f"loss : {loss.item()}")
+            iterator.set_postfix(loss=loss.item())
+        scheduler.step()    
     # model = LinearFinetune(
     #     patch_size=patch_size,
     #     head_type=head_type,
