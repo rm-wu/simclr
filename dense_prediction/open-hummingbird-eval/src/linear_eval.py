@@ -14,8 +14,7 @@ from torch.optim.lr_scheduler import StepLR
 import torchvision.transforms as T
 from torchvision.transforms.functional import InterpolationMode
 from pathlib import Path
-import random
-import os
+
 from typing import Callable
 import einops as ein
 from tqdm import tqdm, trange
@@ -115,24 +114,6 @@ def ls_finetune(
         ]
     )
 
-    # train_transforms = CombTransforms(
-    #     img_transform=img_train_transforms,
-    #     tgt_transform=None,
-    #     img_tgt_transform=shared_train_transform,
-    # )
-    # val_transforms = CombTransforms(
-    #     img_transform=img_val_transforms,
-    #     tgt_transform=None,
-    #     img_tgt_transform=shared_val_transform,
-    # )
-
-    from PIL import Image
-    img = Image.open(
-        "/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data/VOCSegmentation/images/2007_000032.jpg"
-    ).convert("RGB")
-    mask = Image.open(
-        "/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data/VOCSegmentation/SegmentationClassAug/2007_000032.png"
-    )
     train_transforms = Compose(
         [
             RandomResizedCrop(size=input_size, scale=(0.8, 1.0)),
@@ -140,10 +121,8 @@ def ls_finetune(
             ToTensor(),
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
-    )  # (img, mask)
-    # img, mask = train_transforms(img, mask)
-    # print(img.shape, mask.shape)
-
+    )
+    
     if dataset_name == "voc":
         num_classes = 21
         ignore_index = 255
@@ -205,7 +184,6 @@ def ls_finetune(
         raise ValueError(f"{dataset_name} not supported")
 
     # Init Method
-
     assert (input_size / patch_size).is_integer()
     spatial_res = int(input_size // patch_size)
 
@@ -239,35 +217,26 @@ def ls_finetune(
 
             with torch.no_grad():
                 tokens, _ = feat_extr_fn(backbone, images)
-                # print(f"{tokens.shape}")
                 tokens = ein.rearrange(
                     tokens, "b (h w) d -> b d h w", h=spatial_res, w=spatial_res
                 )
-                # print(f"{tokens.shape}")
-                # print(f"{train_mask_size} {type(train_mask_size)}")
                 tokens = nn.functional.interpolate(
                     tokens, size=(train_mask_size, train_mask_size), mode="bilinear"
                 )
-                # print(f"{tokens.shape}")
-
-                # TODO: this part needs to be revised
-                # print(f"m1 : {masks.shape}")
-                masks = T.Resize(
-                    (train_mask_size, train_mask_size),
-                    interpolation=InterpolationMode.NEAREST,
-                )(masks)
-                # print(f"m2 : {masks.shape}")
-
-            # with torch.no_grad():
-            #     tokens = self.model.forward_backbone(imgs)
-            #     if 'vit' in self.arch:
-            #         tokens = tokens[:, 1:].reshape(bs, self.spatial_res, self.spatial_res, self.model.embed_dim).\
-            #             permute(0, 3, 1, 2)
-            #     tokens = nn.functional.interpolate(tokens, size=(self.train_mask_size, self.train_mask_size),
-            #                                        mode='bilinear')
 
             optimizer.zero_grad()
             outputs = linear_head(tokens)
+            masks *= 255
+            if train_mask_size != input_size:
+                with torch.no_grad():
+                    masks = nn.functional.interpolate(
+                        masks, size=(train_mask_size, train_mask_size), mode="nearest"
+                    )
+                masks[masks == ignore_index] = 0
+            # Check for invalid values
+            if torch.any(masks < 0) or torch.any(masks >= num_classes):
+                raise ValueError("Masks contain invalid class indices.")
+
             loss = nn.CrossEntropyLoss()(outputs, masks.long().squeeze())
             loss.backward()
             optimizer.step()
@@ -277,7 +246,7 @@ def ls_finetune(
         scheduler.step()
         print()
         print(f"mean loss : {np.mean(train_losses)}")
-        print(f"lr : {optimizer.param_groups[0]['lr']}")
+        # print(f"lr : {optimizer.param_groups[0]['lr']}")
         print()
 
         # Validation Step
@@ -297,12 +266,18 @@ def ls_finetune(
                 tokens = nn.functional.interpolate(
                     tokens, size=(val_mask_size, val_mask_size), mode="bilinear"
                 )
-                masks_l = T.Resize((val_mask_size, val_mask_size),
-                                 interpolation=InterpolationMode.NEAREST)(masks)
+                masks_l = masks * 255
+                if train_mask_size != input_size:
+                    with torch.no_grad():
+                        masks_l = nn.functional.interpolate(
+                            masks_l,
+                            size=(train_mask_size, train_mask_size),
+                            mode="nearest",
+                        )
+                        masks_l[masks_l == ignore_index] = 0
 
                 outputs = linear_head(tokens)
                 val_loss = nn.CrossEntropyLoss()(outputs, masks_l.long().squeeze())
-                # print(f"val loss : {val_loss.item()}")
                 val_losses.append(val_loss.item())
 
                 # downsample masks and preds
@@ -315,7 +290,7 @@ def ls_finetune(
 
                 # update metric
                 miou_metric.update(gt[valid], mask_preds[valid])
-            # print()
+
             print(f"mean val loss : {np.mean(val_losses)}")
             miou = miou_metric.compute(True, many_to_one=False, linear_probe=True)[0]
             miou_metric.reset()
