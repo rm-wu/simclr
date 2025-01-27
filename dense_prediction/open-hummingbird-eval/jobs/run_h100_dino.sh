@@ -9,10 +9,11 @@
 #SBATCH --mail-type=ALL        
 #SBATCH --mail-user=riccardo.mereu@aalto.fi
 
-#SBATCH --output=job_output_%A_%a.log   
-#SBATCH --error=job_error_%A_%a.log     
+#SBATCH --output=output/job_output_%A_%a.log   
+#SBATCH --error=error/job_error_%A_%a.log     
 
 module load mamba
+conda init
 conda activate hbird_faiss
 
 MEM_SIZE=(128 64 8 -1)
