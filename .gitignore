@@ -8,3 +8,11 @@ wandb/
 scratch/
 PetFace
 data_tars
+**/outputs/
+**/out-cribo
+**/logs/
+**/test/
+**/scratch/
+**/wandb/
+**/PetFace/
+**/data/

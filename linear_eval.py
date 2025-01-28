@@ -1,127 +1,96 @@
+import argparse
+from datetime import datetime
+import torch
 from pathlib import Path
 
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import DeviceStatsMonitor, LearningRateMonitor
-from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
-from torch.nn import Module
-from torch.utils.data import DataLoader
-from torchvision import transforms as T
-
-from lightly.data import LightlyDataset
-from lightly.transforms.utils import IMAGENET_NORMALIZE
-from lightly.utils.benchmarking import LinearClassifier, MetricCallback
-from lightly.utils.dist import print_rank_zero
-
-from petface import PetFaceDataset
+from eval import seed_everything
+from src.models import get_ibot_model_by_name
+from src.ls_eval import ls_finetune
 
 
-def linear_eval(
-    model: Module,
-    train_dir: Path,
-    val_dir: Path,
-    log_dir: Path,
-    batch_size_per_device: int,
-    num_workers: int,
-    accelerator: str,
-    devices: int,
-    # precision: str,
-    num_classes: int,
-) -> None:
-    """Runs a linear evaluation on the given model.
+def main(args):
+    print(f"Linear Segmentation arguments: {args}")
 
-    Parameters follow SimCLR [0] settings.
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    The most important settings are:
-        - Backbone: Frozen
-        - Epochs: 90
-        - Optimizer: SGD
-        - Base Learning Rate: 0.1
-        - Momentum: 0.9
-        - Weight Decay: 0.0
-        - LR Schedule: Cosine without warmup
+    ## Load pretrained model
+    if args.model.startswith("dinov2"):
+        # TODO: this part needs to be checked to see if it can handle also the registers
+        model = torch.hub.load("facebookresearch/dinov2", args.model)
+    elif args.model.startswith("dino"):
+        model = torch.hub.load("facebookresearch/dino:main", args.model)
+    elif args.model.startswith("ibot"):
+        model = get_ibot_model_by_name(args.model)
+    else:
+        raise ValueError(f'Model "{args.model}" not recognized')
+    model = model.to(device)
 
-    References:
-        - [0]: SimCLR, 2020, https://arxiv.org/abs/2002.05709
-    """
-    print_rank_zero("Running linear evaluation...")
+    if args.model.startswith("dinov2"):
 
-    # Setup training data.
-    train_transform = T.Compose(
-        [
-            T.RandomResizedCrop(224),
-            T.RandomHorizontalFlip(),
-            T.ToTensor(),
-            T.Normalize(mean=IMAGENET_NORMALIZE["mean"], std=IMAGENET_NORMALIZE["std"]),
-        ]
+        def token_features(model, imgs):
+            return model.get_intermediate_layers(imgs)[0], None
+
+    else:
+
+        def token_features(model, imgs):
+            return model.get_intermediate_layers(imgs)[0][:, 1:], None
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    args.out_dir = (
+        Path(args.out_dir)
+        / args.dataset_name
+        / f"{args.model}_i{args.input_size}_p{args.patch_size}_e{args.embeddings_size}_b{args.batch_size}_s{args.seed}"
+        / timestamp
     )
-    # train_dataset = LightlyDataset(input_dir=str(train_dir), transform=train_transform)
-    train_dataset = PetFaceDataset(
-        root=train_dir, split="train", transform=train_transform
-    )
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=batch_size_per_device,
-        shuffle=True,
-        num_workers=num_workers,
-        drop_last=True,
-        persistent_workers=False,
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    ls_finetune(
+        backbone=model,
+        patch_size=args.patch_size,
+        head_type="linear",
+        max_epochs=args.max_epochs,
+        lr=args.lr,
+        decay_rate=0.1,
+        drop_at=args.drop_at,
+        batch_size=args.batch_size,
+        dataset_name=args.dataset_name,
+        data_dir=args.data_dir,
+        num_workers=args.num_workers,
+        feat_extr_fn=token_features,
+        input_size=args.input_size,
+        train_mask_size=100,
+        val_mask_size=100,
+        device=device,
     )
 
-    # Setup validation data.
-    val_transform = T.Compose(
-        [
-            T.Resize(256),
-            T.CenterCrop(224),
-            T.ToTensor(),
-            T.Normalize(mean=IMAGENET_NORMALIZE["mean"], std=IMAGENET_NORMALIZE["std"]),
-        ]
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser("Linear Segmentation Evaluation")
+    parser.add_argument("--seed", type=int, default=42)
+
+    parser.add_argument("--model", type=str, required=True)
+    parser.add_argument("--input-size", type=int, default=448)
+    parser.add_argument("--embeddings-size", type=int, required=True)
+    parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument("--patch-size", type=int, default=14)
+
+    parser.add_argument("--lr", type=float, default=0.01)
+    parser.add_argument("--max-epochs", type=int, default=20)
+    parser.add_argument(
+        "--drop_at", type=int, default=20
+    )  # TODO: check what is this about
+
+    parser.add_argument(
+        "--dataset-name", type=str, default="voc", choices=["voc", "ade20k"]
     )
-    # val_dataset = LightlyDataset(input_dir=str(val_dir), transform=val_transform)
-    val_dataset = PetFaceDataset(
-        root=val_dir, split="val", transform=val_transform
-    )
-    val_dataloader = DataLoader(
-        val_dataset,
-        batch_size=batch_size_per_device,
-        shuffle=False,
-        num_workers=num_workers,
-        persistent_workers=False,
+    parser.add_argument("--data-dir", type=str, default="data/")
+    parser.add_argument("--out-dir", type=str, default="outputs/linear_eval/")
+    parser.add_argument("--num-workers", type=int, default=64)
+    parser.add_argument(
+        "--save-features",
+        action="store_true",
+        help="Whether to save the features and labels to the output directory",
     )
 
-    # Train linear classifier.
-    metric_callback = MetricCallback()
-    trainer = Trainer(
-        max_epochs=90,
-        accelerator=accelerator,
-        default_root_dir=log_dir,
-        devices=devices,
-        callbacks=[
-            LearningRateMonitor(),
-            DeviceStatsMonitor(),
-            metric_callback,
-        ],
-        # logger=TensorBoardLogger(save_dir=str(log_dir), name="linear_eval"),
-        logger=WandbLogger(
-            save_dir=str(log_dir),
-            project="simclr",
-            name="linear_eval"
-        ),
-        strategy="ddp_find_unused_parameters_true",
-        num_sanity_val_steps=0,
-    )
-    classifier = LinearClassifier(
-        model=model,
-        batch_size_per_device=batch_size_per_device,
-        feature_dim=model.feature_dim,
-        num_classes=num_classes,
-        freeze_model=True,
-    )
-    trainer.fit(
-        model=classifier,
-        train_dataloaders=train_dataloader,
-        val_dataloaders=val_dataloader,
-    )
-    for metric in ["val_top1", "val_top5"]:
-        print_rank_zero(
-            f"max linear {metric}: {max(metric_callback.val_metrics[metric])}"
-        )
+    args = parser.parse_args()
+    seed_everything(args.seed)
+    main(args)
