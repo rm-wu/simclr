@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 
 from src.hbird_eval import hbird_evaluation
-from src.ibot_vision_transformer import get_ibot_model_by_name
+from src.models import get_ibot_model_by_name
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")

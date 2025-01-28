@@ -1,11 +1,3 @@
-if __name__ == "__main__":
-    # Add project root to path if running this file as a main
-    import sys
-    import pathlib
-
-    p = str(pathlib.Path(__file__).parent.resolve()) + "/"
-    sys.path.append(p)
-
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
@@ -29,15 +21,14 @@ from src.models import FeatureExtractorBeta as FeatureExtractor
 from src.models import FeatureExtractorSimple
 from src.eval_metrics import PredsmIoU
 
-from src.transforms import (
+from src.transforms.transforms import (
     get_hbird_val_transforms,
     get_hbird_train_transforms,
     get_hbird_train_transforms_for_imgs,
 )
 
-from src.image_transformations import CombTransforms
-from src.voc_data import VOCDataModule
-from src.ade20kdata import Ade20kDataModule
+from src.transforms.image_transformations import CombTransforms
+from src.dataset import VOCDataModule, Ade20kDataModule
 
 
 class HbirdEvaluation:

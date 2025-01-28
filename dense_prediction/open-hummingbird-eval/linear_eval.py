@@ -4,9 +4,8 @@ import torch
 from pathlib import Path
 
 from eval import seed_everything
-from src.ibot_vision_transformer import get_ibot_model_by_name
-from src.linear_eval import ls_finetune
-
+from src.models import get_ibot_model_by_name
+from src.ls_eval import ls_finetune
 
 
 def main(args):
@@ -80,7 +79,9 @@ if __name__ == "__main__":
         "--drop_at", type=int, default=20
     )  # TODO: check what is this about
 
-    parser.add_argument("--dataset-name", type=str, default="voc", choices=["voc"])
+    parser.add_argument(
+        "--dataset-name", type=str, default="voc", choices=["voc", "ade20k"]
+    )
     parser.add_argument("--data-dir", type=str, default="data/")
     parser.add_argument("--out-dir", type=str, default="outputs/linear_eval/")
     parser.add_argument("--num-workers", type=int, default=64)

@@ -1,13 +1,3 @@
-# TODO: this part comes from hbird_eval needs to be refactored
-if __name__ == "__main__":
-    # Add project root to path if running this file as a main
-    import sys
-    import pathlib
-
-    p = str(pathlib.Path(__file__).parent.resolve()) + "/"
-    sys.path.append(p)
-
-
 import torch
 from torch import nn
 from torch.optim.lr_scheduler import StepLR
@@ -20,11 +10,11 @@ import einops as ein
 from tqdm import tqdm, trange
 import numpy as np
 
-from src.voc_data import VOCDataModule
-from src.ade20kdata import Ade20kDataModule
+from src.dataset.voc_data import VOCDataModule
+from src.dataset.ade20kdata import Ade20kDataModule
 from src.ls_utils import PredsmIoU
 
-from src.ls_transforms import (
+from src.transforms.image_transformations import (
     SepTransforms,
     Compose,
     Normalize,
@@ -33,28 +23,9 @@ from src.ls_transforms import (
     RandomHorizontalFlip,
     RandomResizedCrop,
     Resize,
+    CombTransforms
 )
-from src.image_transformations import CombTransforms
 
-
-class LinearFinetune(nn.Module):
-    def __init__(
-        self,
-        patch_size: int,
-        num_classes: int,
-        lr: float,
-        input_size: int,
-        spatial_res: int,
-        val_iters: int,
-        drop_at: int,
-        backbone: nn.Module,
-    ):
-        super().__init__()
-        self.backbone = backbone
-        self.head = nn.Conv2d(self.backbone.embed_dim, num_classes, 1)
-
-    def forward(self):
-        pass
 
 
 def ls_finetune(
@@ -167,19 +138,19 @@ def ls_finetune(
     #                                  train_transforms=train_transforms,
     #                                  val_transforms=val_image_transforms,
     #                                  val_target_transforms=val_target_transforms)
-    # elif dataset_name == "ade20k":
+    elif dataset_name == "ade20k":
     #     # TODO: Evaluate its correctness
-    #     num_classes = 151
-    #     ignore_index = 0
-    #     val_transforms = SepTransforms(val_image_transforms, val_target_transforms)
-    #     data_module = Ade20kDataModule(
-    #         data_dir,
-    #         train_transforms=train_transforms,
-    #         val_transforms=val_transforms,
-    #         shuffle=False,
-    #         num_workers=num_workers,
-    #         batch_size=batch_size,
-    #     )
+        num_classes = 151
+        ignore_index = 0
+        # val_transforms = SepTransforms(val_image_transforms, val_target_transforms)
+        data_module = Ade20kDataModule(
+            data_dir,
+            train_transforms=train_transforms,
+            val_transforms=val_transforms,
+            shuffle=False,
+            num_workers=num_workers,
+            batch_size=batch_size,
+        )
     else:
         raise ValueError(f"{dataset_name} not supported")
 
@@ -205,14 +176,16 @@ def ls_finetune(
     train_loader = data_module.train_dataloader()
     val_loader = data_module.val_dataloader()
     train_losses = []
+    pbar = trange(max_epochs, ncols=80)
 
-    for epoch in trange(max_epochs, ncols=80):
-        iterator = tqdm(train_loader, ncols=80)
-        for batch in iterator:
+    for epoch in pbar:
+        pbar.set_description(f"Epoch [{epoch}]")
+        pbar_iter = tqdm(train_loader, ncols=80)
+        for batch in pbar_iter:
             images, masks = batch
             images = images.to(device)
             masks = masks.to(device)
-            B, C, H, W = images.shape
+            _, _, H, W = images.shape
             assert H == W == input_size
 
             with torch.no_grad():
@@ -232,7 +205,6 @@ def ls_finetune(
                     masks = nn.functional.interpolate(
                         masks, size=(train_mask_size, train_mask_size), mode="nearest"
                     )
-                masks[masks == ignore_index] = 0
             # Check for invalid values
             if torch.any(masks < 0) or torch.any(masks >= num_classes):
                 raise ValueError("Masks contain invalid class indices.")
@@ -240,14 +212,13 @@ def ls_finetune(
             loss = nn.CrossEntropyLoss()(outputs, masks.long().squeeze())
             loss.backward()
             optimizer.step()
-            # print(f"loss : {loss.item()}")
-            iterator.set_postfix(loss=loss.item())
+            
+            pbar_iter.set_postfix(loss=loss.item())
             train_losses.append(loss.item())
+            
         scheduler.step()
         print()
-        print(f"mean loss : {np.mean(train_losses)}")
-        # print(f"lr : {optimizer.param_groups[0]['lr']}")
-        print()
+        print(f"Epoch [{epoch+1}/{max_epochs}]: mean loss : {np.mean(train_losses)}")
 
         # Validation Step
         if epoch % 5 == 0 or epoch == max_epochs - 1:

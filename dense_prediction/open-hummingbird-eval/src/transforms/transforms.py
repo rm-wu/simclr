@@ -1,7 +1,7 @@
-import torchvision.transforms as trn
+import torchvision.transforms as T
 import torch
 import torch.nn.functional as F
-from src.image_transformations import Compose, RandomResizedCrop, RandomHorizontalFlip, Resize
+from src.transforms.image_transformations import Compose, RandomResizedCrop, RandomHorizontalFlip, Resize, ToTensor
 
 IMAGNET_MEAN = [0.485, 0.456, 0.406]
 IMAGNET_STD = [0.229, 0.224, 0.255]
@@ -22,16 +22,16 @@ def get_hbird_train_transforms_for_imgs(input_size = 224,
 
 
     # 1. Image transformations for training
-    image_train_global_transforms = [trn.RandomResizedCrop(size=(input_size, input_size), scale=(min_scale_factor, max_scale_factor))]
+    image_train_global_transforms = [T.RandomResizedCrop(size=(input_size, input_size), scale=(min_scale_factor, max_scale_factor))]
     image_train_local_transforms = [
-        trn.RandomApply([trn.ColorJitter(brightness=brightness_jitter_range)], p=brightness_jitter_probability),
-        trn.RandomApply([trn.ColorJitter(contrast=contrast_jitter_range)], p=contrast_jitter_probability),
-        trn.RandomApply([trn.ColorJitter(saturation=saturation_jitter_range)], p=saturation_jitter_probability),
-        trn.RandomApply([trn.ColorJitter(hue=hue_jitter_range)], p=hue_jitter_probability),
-        trn.ToTensor(),
-        trn.Normalize(mean=img_mean, std=img_std)
+        T.RandomApply([T.ColorJitter(brightness=brightness_jitter_range)], p=brightness_jitter_probability),
+        T.RandomApply([T.ColorJitter(contrast=contrast_jitter_range)], p=contrast_jitter_probability),
+        T.RandomApply([T.ColorJitter(saturation=saturation_jitter_range)], p=saturation_jitter_probability),
+        T.RandomApply([T.ColorJitter(hue=hue_jitter_range)], p=hue_jitter_probability),
+        T.ToTensor(),
+        T.Normalize(mean=img_mean, std=img_std)
     ]
-    image_train_transform = trn.Compose([*image_train_global_transforms, *image_train_local_transforms])
+    image_train_transform = T.Compose([*image_train_global_transforms, *image_train_local_transforms])
 
     # 3. Return the transformations in dictionaries for training and validation
     train_transforms = {"img": image_train_transform, "target": None, "shared": None}
@@ -83,19 +83,20 @@ def get_hbird_train_transforms(input_size = 224,
         img_std = IMAGNET_STD):
 
     # 1. Image transformations for training
-    image_train_transform = trn.Compose([
-        trn.RandomApply([trn.ColorJitter(brightness=brightness_jitter_range)], p=brightness_jitter_probability),
-        trn.RandomApply([trn.ColorJitter(contrast=contrast_jitter_range)], p=contrast_jitter_probability),
-        trn.RandomApply([trn.ColorJitter(saturation=saturation_jitter_range)], p=saturation_jitter_probability),
-        trn.RandomApply([trn.ColorJitter(hue=hue_jitter_range)], p=hue_jitter_probability),
-        trn.ToTensor(),
-        trn.Normalize(mean=img_mean, std=img_std)
+    image_train_transform = T.Compose([
+        T.RandomApply([T.ColorJitter(brightness=brightness_jitter_range)], p=brightness_jitter_probability),
+        T.RandomApply([T.ColorJitter(contrast=contrast_jitter_range)], p=contrast_jitter_probability),
+        T.RandomApply([T.ColorJitter(saturation=saturation_jitter_range)], p=saturation_jitter_probability),
+        T.RandomApply([T.ColorJitter(hue=hue_jitter_range)], p=hue_jitter_probability),
+        T.ToTensor(),
+        T.Normalize(mean=img_mean, std=img_std)
     ])
 
     # 2. Shared transformations for training
     shared_train_transform = Compose([
         RandomResizedCrop(size=(input_size, input_size), scale=(min_scale_factor, max_scale_factor)),
         # RandomHorizontalFlip(probability=0.1),
+        ToTensor()
     ])
 
     # 3. Return the transformations in dictionaries for training and validation
@@ -114,14 +115,15 @@ def get_default_train_transforms(input_size = 224,
                     min_scale_factor = 0.5,
                     max_scale_factor = 2.0):
     # 1. Image transformations for training
-    image_train_transform = trn.Compose([
-        trn.ToTensor(),
-        trn.Normalize(mean=img_mean, std=img_std)
+    image_train_transform = T.Compose([
+        T.ToTensor(),
+        T.Normalize(mean=img_mean, std=img_std)
     ])
 
     # 2. Shared transformations for training
     shared_train_transform = Compose([
         RandomResizedCrop(size=(input_size, input_size), scale=(min_scale_factor, max_scale_factor)),
+        ToTensor()
     ])
     # 3. Return the transformations in dictionary for training
     return {"img": image_train_transform, "target": None, "shared": shared_train_transform}
@@ -131,13 +133,14 @@ def get_default_val_transforms(input_size = 224,
                     img_std = IMAGNET_STD):
     # 1. Image transformations for validation
     if img_mean is None or img_std is None:
-        image_val_transform = trn.Compose([trn.Resize((input_size, input_size)), trn.ToTensor()])
+        image_val_transform = T.Compose([T.Resize((input_size, input_size)), T.ToTensor()])
     else:
-        image_val_transform = trn.Compose([trn.Resize((input_size, input_size)), trn.ToTensor(), trn.Normalize(mean=img_mean, std=img_std)])
+        image_val_transform = T.Compose([T.Resize((input_size, input_size)), T.ToTensor(), T.Normalize(mean=img_mean, std=img_std)])
 
     # 2. Shared transformations for validation
     shared_val_transform = Compose([
         Resize(size=(input_size, input_size)),
+        ToTensor()
     ])
 
     # 3. Return the transformations in a dictionary for validation
