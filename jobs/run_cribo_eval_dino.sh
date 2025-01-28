@@ -1,0 +1,39 @@
+#!/bin/bash
+#SBATCH --time=04:00:00
+#SBATCH --mem=128G
+#SBATCH --output=heval_dino_run_%A_%a.out
+#SBATCH --gpus=1
+#SBATCH --array=0
+#SBATCH --cpus-per-task=8
+
+module load mamba
+source activate hummingbird-eval
+
+MEM_SIZE=(128 64 8 -1)
+MODEL_NAME=(dino_vits16 dino_vitb16 dinov2_vits14 dinov2_vitb14 dinov2_vitl14 dinov2_vitg14)
+EMB_SIZE=(384 768 384 768 1024 1536)
+IMG_SIZE=(512 512 504 504 504 504)
+PATCH_SIZE=(16 16 14 14 14 14)
+BATCH_SIZE=(64 32 64 32 16 16)
+
+N_MEM=${#MEM_SIZE[@]}
+N_MODEL=${#MODEL_NAME[@]}
+
+mem_i=${MEM_SIZE[($SLURM_ARRAY_TASK_ID / $N_MODEL) % $N_MEM]}
+model_i=${MODEL_NAME[$SLURM_ARRAY_TASK_ID % $N_MODEL]}
+emb_i=${EMB_SIZE[$SLURM_ARRAY_TASK_ID % $N_MODEL]}
+img_i=${IMG_SIZE[$SLURM_ARRAY_TASK_ID % $N_MODEL]}
+patch_i=${PATCH_SIZE[$SLURM_ARRAY_TASK_ID % $N_MODEL]}
+batch_i=${BATCH_SIZE[$SLURM_ARRAY_TASK_ID % $N_MODEL]}
+
+echo "Model: $model_i"
+echo "Memory: $mem_i"
+echo "Embeddings: $emb_i"
+echo "Image Size: $img_i"
+echo "Patch Size: $patch_i"
+echo "Batch Size: $batch_i"
+
+python eval.py --seed 42 --batch-size $batch_i --input-size $img_i --patch-size $patch_i --memory-size $mem_i --embeddings-size $emb_i --data-dir data --model $model_i
+
+# python eval.py --seed 42 --batch-size=64 --input-size=512 --patch-size=16 --memory-size=-1 --embeddings-size=384 --data-dir=data/ --model=dino_vits16
+# python eval.py --seed 42 --batch-size=64 --input-size=504 --patch-size=14 --memory-size=-1 --embeddings-size=384 --data-dir=data/ --model=dinov2_vits14

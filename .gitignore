@@ -8,5 +8,12 @@ wandb/
 scratch/
 PetFace
 data_tars
-**/ILSVRC2012_img_train.tar
-img.png
+**/outputs/
+**/out-cribo
+**/logs/
+**/test/
+**/scratch/
+**/wandb/
+**/PetFace/
+**/data/
+>>>>>>> main
