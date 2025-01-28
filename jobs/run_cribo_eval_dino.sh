@@ -35,4 +35,5 @@ echo "Batch Size: $batch_i"
 
 python eval.py --seed 42 --batch-size $batch_i --input-size $img_i --patch-size $patch_i --memory-size $mem_i --embeddings-size $emb_i --data-dir data --model $model_i
 
-python eval.py --seed 42 --batch-size=64 --input-size=512 --patch-size=16 --memory-size=-1 --embeddings-size=384 --data-dir=data/ --model=dino_vits16
+# python eval.py --seed 42 --batch-size=64 --input-size=512 --patch-size=16 --memory-size=-1 --embeddings-size=384 --data-dir=data/ --model=dino_vits16
+# python eval.py --seed 42 --batch-size=64 --input-size=504 --patch-size=14 --memory-size=-1 --embeddings-size=384 --data-dir=data/ --model=dinov2_vits14
