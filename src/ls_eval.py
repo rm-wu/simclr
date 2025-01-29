@@ -197,6 +197,19 @@ def ls_finetune(
                     tokens, size=(train_mask_size, train_mask_size), mode="bilinear"
                 )
 
+            # optimizer.zero_grad()
+            # outputs = linear_head(tokens)
+            # masks *= 255
+            # if train_mask_size != input_size:
+            #     with torch.no_grad():
+            #         masks = nn.functional.interpolate(
+            #             masks, size=(train_mask_size, train_mask_size), mode="nearest"
+            #         )
+
+            # loss = nn.CrossEntropyLoss()(outputs, masks.long().squeeze())
+            # loss.backward()
+            # optimizer.step()
+            
             optimizer.zero_grad()
             outputs = linear_head(tokens)
             masks *= 255
@@ -205,14 +218,9 @@ def ls_finetune(
                     masks = nn.functional.interpolate(
                         masks, size=(train_mask_size, train_mask_size), mode="nearest"
                     )
-            # Check for invalid values
-            if torch.any(masks < 0) or torch.any(masks >= num_classes):
-                raise ValueError("Masks contain invalid class indices.")
-
-            loss = nn.CrossEntropyLoss()(outputs, masks.long().squeeze())
+            loss = nn.CrossEntropyLoss(ignore_index=ignore_index)(outputs, masks.long().squeeze())
             loss.backward()
             optimizer.step()
-            
             pbar_iter.set_postfix(loss=loss.item())
             train_losses.append(loss.item())
             
@@ -237,31 +245,20 @@ def ls_finetune(
                     tokens = nn.functional.interpolate(
                         tokens, size=(val_mask_size, val_mask_size), mode="bilinear"
                     )
-                    masks_l = masks * 255
-                    if train_mask_size != input_size:
-                        with torch.no_grad():
-                            masks_l = nn.functional.interpolate(
-                                masks_l,
-                                size=(train_mask_size, train_mask_size),
-                                mode="nearest",
-                            )
-                            masks_l[masks_l == ignore_index] = 0
-
                     outputs = linear_head(tokens)
-                    val_loss = nn.CrossEntropyLoss()(outputs, masks_l.long().squeeze())
+                    val_loss = nn.CrossEntropyLoss(ignore_index=ignore_index)(outputs, masks.long().squeeze())
                     val_losses.append(val_loss.item())
+                    
+                    mask_preds = torch.argmax(outputs, dim=1).unsqueeze(1)
 
-                    # downsample masks and preds
                     gt = masks * 255
                     gt = nn.functional.interpolate(
                         gt, size=(val_mask_size, val_mask_size), mode="nearest"
                     )
                     valid = gt != ignore_index  # mask to remove object boundary class
-                    mask_preds = torch.argmax(outputs, dim=1).unsqueeze(1)
-
                     # update metric
                     miou_metric.update(gt[valid], mask_preds[valid])
-
+                    
                 print(f"mean val loss : {np.mean(val_losses)}")
                 miou = miou_metric.compute(True, many_to_one=False, linear_probe=True)[0]
                 miou_metric.reset()
