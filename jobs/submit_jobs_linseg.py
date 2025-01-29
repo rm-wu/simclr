@@ -3,17 +3,17 @@ from pathlib import Path
 model_names = [
     "dino_vits16",
     "dino_vitb16",
-    # "dinov2_vits14",
-    # "dinov2_vitb14",
+    "dinov2_vits14",
+    "dinov2_vitb14",
     # "dinov2_vitl14",
     # "dinov2_vitg14",
     "ibot_vits16",
     "ibot_vitb16",
     # TODO: MAE and CriBO
 ]
-emb_sizes = [384, 768, 384, 768]
-img_sizes = [512, 512, 512, 512]
-patch_sizes = [16, 16, 16, 16]
+emb_sizes = [384, 768, 384, 768,384, 768]
+img_sizes = [512, 512, 504, 504, 512, 512]
+patch_sizes = [16, 16, 14, 14, 16, 16]
 seed = 42
 # batch_sizes = [128, 64, 128, 64]
 project_path = Path("/scratch/project_462000585/mereuric/ssl_nat_aug/")
@@ -45,7 +45,7 @@ script_template = """#!/bin/bash
 #SBATCH --mail-type=ALL        
 #SBATCH --mail-user=riccardo.mereu@aalto.fi
 
-#SBATCH --output={logs_path}job_output_%j.log   
+#SBATCH --output={logs_path}/job_output_%j.log   
 #SBATCH --error={logs_path}/job_error_%j.log     
 
 module use /appl/local/training/modules/AI-20250204/
@@ -83,6 +83,6 @@ for model_idx, model_name in enumerate(model_names):
     )
     job_files.append(job_file)
 
-# with open("submit_jobs.sh", "w") as f:
-#     for job_file in job_files:
-#         f.write(f"sbatch {job_file}\n")
+with open("submit_jobs.sh", "w") as f:
+    for job_file in job_files:
+        f.write(f"sbatch {job_file}\n")
