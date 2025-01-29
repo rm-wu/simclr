@@ -178,7 +178,7 @@ def ls_finetune(
     pbar = trange(max_epochs, ncols=80)
 
     for epoch in pbar:
-        pbar.set_description(f"Epoch [{epoch + 1}]")
+        pbar.set_description(f"Epoch [{epoch}]")
         pbar_iter = tqdm(train_loader, ncols=80)
         for batch in pbar_iter:
             images, masks = batch
@@ -227,7 +227,7 @@ def ls_finetune(
 
         scheduler.step()
         print()
-        print(f"Epoch [{epoch+1}/{max_epochs}]: mean loss : {np.mean(train_losses)}")
+        print(f"Epoch [{epoch}/{max_epochs-1}]: mean loss : {np.mean(train_losses)}")
 
         # Validation Step
         if epoch % 5 == 0 or epoch == max_epochs - 1:
