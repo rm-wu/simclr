@@ -246,8 +246,6 @@ def ls_finetune(
                         tokens, size=(val_mask_size, val_mask_size), mode="bilinear"
                     )
                     outputs = linear_head(tokens)
-                    val_loss = nn.CrossEntropyLoss(ignore_index=ignore_index)(outputs, masks.long().squeeze())
-                    val_losses.append(val_loss.item())
                     
                     mask_preds = torch.argmax(outputs, dim=1).unsqueeze(1)
 
@@ -255,6 +253,8 @@ def ls_finetune(
                     gt = nn.functional.interpolate(
                         gt, size=(val_mask_size, val_mask_size), mode="nearest"
                     )
+                    val_loss = nn.CrossEntropyLoss(ignore_index=ignore_index)(outputs, gt.long().squeeze())
+                    val_losses.append(val_loss.item())
                     valid = gt != ignore_index  # mask to remove object boundary class
                     # update metric
                     miou_metric.update(gt[valid], mask_preds[valid])
