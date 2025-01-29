@@ -23,9 +23,8 @@ from src.transforms.image_transformations import (
     RandomHorizontalFlip,
     RandomResizedCrop,
     Resize,
-    CombTransforms
+    CombTransforms,
 )
-
 
 
 def ls_finetune(
@@ -93,7 +92,7 @@ def ls_finetune(
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
-    
+
     if dataset_name == "voc":
         num_classes = 21
         ignore_index = 255
@@ -139,7 +138,7 @@ def ls_finetune(
     #                                  val_transforms=val_image_transforms,
     #                                  val_target_transforms=val_target_transforms)
     elif dataset_name == "ade20k":
-    #     # TODO: Evaluate its correctness
+        # TODO: Evaluate its correctness
         num_classes = 151
         ignore_index = 0
         # val_transforms = SepTransforms(val_image_transforms, val_target_transforms)
@@ -179,7 +178,7 @@ def ls_finetune(
     pbar = trange(max_epochs, ncols=80)
 
     for epoch in pbar:
-        pbar.set_description(f"Epoch [{epoch}]")
+        pbar.set_description(f"Epoch [{epoch + 1}]")
         pbar_iter = tqdm(train_loader, ncols=80)
         for batch in pbar_iter:
             images, masks = batch
@@ -209,7 +208,7 @@ def ls_finetune(
             # loss = nn.CrossEntropyLoss()(outputs, masks.long().squeeze())
             # loss.backward()
             # optimizer.step()
-            
+
             optimizer.zero_grad()
             outputs = linear_head(tokens)
             masks *= 255
@@ -218,12 +217,14 @@ def ls_finetune(
                     masks = nn.functional.interpolate(
                         masks, size=(train_mask_size, train_mask_size), mode="nearest"
                     )
-            loss = nn.CrossEntropyLoss(ignore_index=ignore_index)(outputs, masks.long().squeeze())
+            loss = nn.CrossEntropyLoss(ignore_index=ignore_index)(
+                outputs, masks.long().squeeze()
+            )
             loss.backward()
             optimizer.step()
             pbar_iter.set_postfix(loss=loss.item())
             train_losses.append(loss.item())
-            
+
         scheduler.step()
         print()
         print(f"Epoch [{epoch+1}/{max_epochs}]: mean loss : {np.mean(train_losses)}")
@@ -246,21 +247,25 @@ def ls_finetune(
                         tokens, size=(val_mask_size, val_mask_size), mode="bilinear"
                     )
                     outputs = linear_head(tokens)
-                    
+
                     mask_preds = torch.argmax(outputs, dim=1).unsqueeze(1)
 
                     gt = masks * 255
                     gt = nn.functional.interpolate(
                         gt, size=(val_mask_size, val_mask_size), mode="nearest"
                     )
-                    val_loss = nn.CrossEntropyLoss(ignore_index=ignore_index)(outputs, gt.long().squeeze())
+                    val_loss = nn.CrossEntropyLoss(ignore_index=ignore_index)(
+                        outputs, gt.long().squeeze()
+                    )
                     val_losses.append(val_loss.item())
                     valid = gt != ignore_index  # mask to remove object boundary class
                     # update metric
                     miou_metric.update(gt[valid], mask_preds[valid])
-                    
+
                 print(f"mean val loss : {np.mean(val_losses)}")
-                miou = miou_metric.compute(True, many_to_one=False, linear_probe=True)[0]
+                miou = miou_metric.compute(True, many_to_one=False, linear_probe=True)[
+                    0
+                ]
                 miou_metric.reset()
                 print(f"miou : {miou}")
                 print()
