@@ -30,17 +30,23 @@
             "name": "linear eval",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/dense_prediction/open-hummingbird-eval/linear_eval.py",
+            "program": "${workspaceFolder}/linear_eval.py",
             "console": "integratedTerminal",
             "justMyCode": false,
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "1"
+            },
             "args": [
                 "--model=dinov2_vits14",
                 "--input-size=504",
                 "--patch-size=14",
                 "--embeddings-size=384",
-                "--dataset-name=voc",
-                "--data-dir=/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/data",
-                "--out-dir=/home/mereur1/projects/ocl/ssl_nat_aug/dense_prediction/open-hummingbird-eval/outputs/debug/"
+                "--dataset-name=coco-thing",
+                "--num-workers=16",
+                "--data-dir=/home/mereur1/projects/ocl/ssl_nat_aug/data/coco_stuff164k",
+                // "--data-dir=/home/mereur1/projects/ocl/ssl_nat_aug/data/COCO/",
+                "--out-dir=/home/mereur1/projects/ocl/ssl_nat_aug/outputs/debug/"
+                
             ]
         },
 

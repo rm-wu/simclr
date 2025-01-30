@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.functional as F
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, Dataset
 

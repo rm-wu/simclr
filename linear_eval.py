@@ -80,7 +80,10 @@ if __name__ == "__main__":
     )  # TODO: check what is this about
 
     parser.add_argument(
-        "--dataset-name", type=str, default="voc", choices=["voc", "ade20k"]
+        "--dataset-name",
+        type=str,
+        default="voc",
+        choices=["voc", "ade20k", "coco-thing", "coco-stuff"],
     )
     parser.add_argument("--data-dir", type=str, default="data/")
     parser.add_argument("--out-dir", type=str, default="outputs/linear_eval/")

@@ -1,7 +1,0 @@
-- [ ] Add the code for the COCO dataset (do it locally)
-- [ ] Add code for the missing models
-- [ ] Populate the table with the results of the experiments of the linear segmentation task
-    - [ ] Wait for the experiment on VOC to finish
-- [ ] fix the environment files once and for all
-- [ ] add how to install the environment on the cluster to the README.md
-- [ ] add how to download the data to the README.md

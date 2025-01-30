@@ -3,6 +3,7 @@ from torch import nn
 from torch.optim.lr_scheduler import StepLR
 import torchvision.transforms as T
 from torchvision.transforms.functional import InterpolationMode
+import random
 from pathlib import Path
 
 from typing import Callable
@@ -10,8 +11,7 @@ import einops as ein
 from tqdm import tqdm, trange
 import numpy as np
 
-from src.dataset.voc_data import VOCDataModule
-from src.dataset.ade20kdata import Ade20kDataModule
+from src.dataset import VOCDataModule, Ade20kDataModule, CocoDataModule
 from src.ls_utils import PredsmIoU
 
 from src.transforms.image_transformations import (
@@ -50,32 +50,32 @@ def ls_finetune(
     # train_mask_size = 100
     # val_mask_size = 100
 
-    img_train_transforms = T.Compose(
-        [
-            T.RandomHorizontalFlip(p=0.5),
-            T.ToTensor(),
-            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]
-    )
-    shared_train_transform = Compose(
-        [RandomResizedCrop(size=input_size, scale=(0.8, 1.0))]
-    )
+    # img_train_transforms = T.Compose(
+    #     [
+    #         T.RandomHorizontalFlip(p=0.5),
+    #         T.ToTensor(),
+    #         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    #     ]
+    # )
+    # shared_train_transform = Compose(
+    #     [RandomResizedCrop(size=input_size, scale=(0.8, 1.0))]
+    # )
 
-    img_val_transforms = T.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-    )
-    shared_val_transform = T.Compose(
-        [
-            Resize((input_size, input_size)),
-            T.ToTensor(),
-        ]
-    )
-    val_target_transforms = T.Compose(
-        [
-            T.Resize((input_size, input_size), interpolation=InterpolationMode.NEAREST),
-            T.ToTensor(),
-        ]
-    )
+    # img_val_transforms = T.Normalize(
+    #     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+    # )
+    # shared_val_transform = T.Compose(
+    #     [
+    #         Resize((input_size, input_size)),
+    #         T.ToTensor(),
+    #     ]
+    # )
+    # val_target_transforms = T.Compose(
+    #     [
+    #         T.Resize((input_size, input_size), interpolation=InterpolationMode.NEAREST),
+    #         T.ToTensor(),
+    #     ]
+    # )
     val_transforms = Compose(
         [
             Resize((input_size, input_size)),
@@ -109,34 +109,38 @@ def ls_finetune(
             # val_target_transform=None,
             val_transforms=val_transforms,
         )
-    # TODO: This part is missing since the open-hummingbird-eval does not support
-    # COCO. But it should be possible to integrate that from NeCo repository maybe.
-    # elif "coco" in dataset_name:
-    #     assert len(dataset_name.split("-")) == 2
-    #     mask_type = dataset_name.split("-")[-1]
-    #     assert mask_type in ["thing", "stuff"]
-    #     if mask_type == "thing":
-    #         num_classes = 12
-    #     else:
-    #         num_classes = 15
-    #     ignore_index = 255
-    #     file_list = os.listdir(os.path.join(data_dir, "images", "train2017"))
-    #     file_list_val = os.listdir(os.path.join(data_dir, "images", "val2017"))
-    #     random.shuffle(file_list_val)
-    #     # sample 10% of train images
-    #     random.shuffle(file_list)
-    #     file_list = file_list[:int(len(file_list)*0.1)]
-    #     print(f"sampled {len(file_list)} COCO images for training")
+    elif "coco" in dataset_name:
+        assert len(dataset_name.split("-")) == 2
+        mask_type = dataset_name.split("-")[-1]
+        assert mask_type in ["thing", "stuff"]
+        if mask_type == "thing":
+            num_classes = 12
+        else:
+            num_classes = 15
+        ignore_index = 255
+        # file_list = os.listdir(os.path.join(data_dir, "images", "train2017"))
+        # file_list_val = os.listdir(os.path.join(data_dir, "images", "val2017"))
+        file_list = list(Path(data_dir, "images", "train2017").iterdir())
+        file_list_val = list(Path(data_dir, "images", "val2017").iterdir())
+        random.shuffle(file_list_val)
+        # sample 10% of train images
+        random.shuffle(file_list)
+        file_list = file_list[: int(len(file_list) * 0.1)]
+        print(f"sampled {len(file_list)} COCO images for training")
 
-    #     data_module = CocoDataModule(batch_size=train_config["batch_size"],
-    #                                  num_workers=_config["num_workers"],
-    #                                  file_list=file_list,
-    #                                  data_dir=data_dir,
-    #                                  file_list_val=file_list_val,
-    #                                  mask_type=mask_type,
-    #                                  train_transforms=train_transforms,
-    #                                  val_transforms=val_image_transforms,
-    #                                  val_target_transforms=val_target_transforms)
+        data_module = CocoDataModule(
+            batch_size=batch_size,
+            num_workers=num_workers,
+            file_list=file_list,
+            data_dir=data_dir,
+            file_list_val=file_list_val,
+            mask_type=mask_type,
+            train_transforms=train_transforms,
+            val_transforms=val_transforms,
+            num_classes=num_classes,
+            #  val_transforms=val_image_transforms,
+            #  val_target_transforms=val_target_transforms
+        )
     elif dataset_name == "ade20k":
         # TODO: Evaluate its correctness
         num_classes = 151
@@ -174,6 +178,7 @@ def ls_finetune(
     num_classes = data_module.get_num_classes()
     train_loader = data_module.train_dataloader()
     val_loader = data_module.val_dataloader()
+    
     train_losses = []
     pbar = trange(max_epochs, ncols=80)
 
@@ -195,19 +200,6 @@ def ls_finetune(
                 tokens = nn.functional.interpolate(
                     tokens, size=(train_mask_size, train_mask_size), mode="bilinear"
                 )
-
-            # optimizer.zero_grad()
-            # outputs = linear_head(tokens)
-            # masks *= 255
-            # if train_mask_size != input_size:
-            #     with torch.no_grad():
-            #         masks = nn.functional.interpolate(
-            #             masks, size=(train_mask_size, train_mask_size), mode="nearest"
-            #         )
-
-            # loss = nn.CrossEntropyLoss()(outputs, masks.long().squeeze())
-            # loss.backward()
-            # optimizer.step()
 
             optimizer.zero_grad()
             outputs = linear_head(tokens)
