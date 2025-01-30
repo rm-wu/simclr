@@ -2,6 +2,7 @@ import argparse
 from datetime import datetime
 import torch
 from pathlib import Path
+import timm
 
 from eval import seed_everything
 from src.models import get_ibot_model_by_name
@@ -21,11 +22,20 @@ def main(args):
         model = torch.hub.load("facebookresearch/dino:main", args.model)
     elif args.model.startswith("ibot"):
         model = get_ibot_model_by_name(args.model)
+    elif args.model.startswith("mae_vitb16"):
+        model = timm.create_model(
+            "vit_base_patch16_224.mae",
+            pretrained=True,
+            num_classes=0,
+            dynamic_img_size=True,
+            dynamic_img_pad=False,
+        )
+        
     else:
         raise ValueError(f'Model "{args.model}" not recognized')
     model = model.to(device)
 
-    if args.model.startswith("dinov2"):
+    if args.model.startswith("dinov2") or args.model.startswith("mae"):
 
         def token_features(model, imgs):
             return model.get_intermediate_layers(imgs)[0], None
