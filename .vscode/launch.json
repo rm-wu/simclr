@@ -38,65 +38,27 @@
             },
             "args": [
                 // "--model=dinov2_vits14",
-                "--model=mae_vitb16",
+                // "--model=mae_vitb16",
+                "--model=cribo_vits16_in1k",
                 "--input-size=512",
                 "--patch-size=16",
-                "--embeddings-size=768",
-                "--dataset-name=coco-thing",
+                "--embeddings-size=384",
+                "--dataset-name=voc",
                 "--num-workers=32",
-                "--data-dir=/home/mereur1/projects/ocl/ssl_nat_aug/data/coco/",
+                "--data-dir=/home/mereur1/projects/ocl/ssl_nat_aug/data/",
                 // "--data-dir=/home/mereur1/projects/ocl/ssl_nat_aug/data/COCO/",
                 "--out-dir=/home/mereur1/projects/ocl/ssl_nat_aug/outputs/debug/"
                 
             ]
         },
-
         {
-            "name": "train.py",
+            "name": "cribo",
             "type": "debugpy",
             "request": "launch",
-            "program": "train.py",
+            "program": "${workspaceFolder}/scratch/cribo.py",
             "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": [
-                "--fast_dev_run",
-                "--devices=1",
-                "--num_workers=8"
-            ]
-        },
-        {
-            "name": "dino debugging",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "train.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": [
-                "--fast_dev_run",
-                "--devices=1",
-                "--num_workers=8",
-                "--method=dino",
-                // "--natural_augmentation"
-            ]
-        },
-        {
-            "name": "pmsn debugging",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "train.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": [
-                // "--fast_dev_run",
-                "--devices=1",
-                "--num_workers=8",
-                "--data_dir=../data/PetFace",
-                "--method=pmsn",
-                "--batch_size_per_device=128",
-                "--limit_train_batches=0.01",
-                "--max_epochs=1",
-                "--natural_augmentation"
-            ]
+            "justMyCode": false
         }
+
     ]
 }

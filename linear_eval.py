@@ -5,7 +5,7 @@ from pathlib import Path
 import timm
 
 from eval import seed_everything
-from src.models import get_ibot_model_by_name
+from src.models import get_ibot_model_by_name, get_cribo_model_by_name
 from src.ls_eval import ls_finetune
 
 
@@ -22,6 +22,8 @@ def main(args):
         model = torch.hub.load("facebookresearch/dino:main", args.model)
     elif args.model.startswith("ibot"):
         model = get_ibot_model_by_name(args.model)
+    elif args.model.startswith("cribo"):
+        model = get_cribo_model_by_name(args.model, student_or_teacher="teacher")
     elif args.model.startswith("mae_vitb16"):
         model = timm.create_model(
             "vit_base_patch16_224.mae",
@@ -30,7 +32,7 @@ def main(args):
             dynamic_img_size=True,
             dynamic_img_pad=False,
         )
-        
+
     else:
         raise ValueError(f'Model "{args.model}" not recognized')
     model = model.to(device)
@@ -77,7 +79,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("Linear Segmentation Evaluation")
     parser.add_argument("--seed", type=int, default=42)
 
-    parser.add_argument("--model", type=str, required=True)
+    parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        choices=[
+            "dino_vits16",
+            "dino_vitb16",
+            "dinov2_vits14",
+            "dinov2_vitb14",
+            "ibot_vits16",
+            "ibot_vitb16",
+            "mae_vitb16",
+            # TODO: for now I'm loading the teacher model by default
+            "cribo_vits16_coco",
+            "cribo_vitb16_in1k",
+            "cribo_vits16_in1k",
+        ],
+    )
     parser.add_argument("--input-size", type=int, default=448)
     parser.add_argument("--embeddings-size", type=int, required=True)
     parser.add_argument("--batch-size", type=int, default=128)
