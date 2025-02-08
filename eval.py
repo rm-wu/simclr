@@ -3,11 +3,13 @@ import torch
 import random
 import argparse
 import numpy as np
+import timm
 
 from src.hbird_eval import hbird_evaluation
-from src.models import get_ibot_model_by_name
+from src.models import get_ibot_model_by_name, get_cribo_model_by_name
 
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")
 
 
@@ -16,31 +18,46 @@ def main(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if args.model.startswith("dinov2"):
-        model = torch.hub.load('facebookresearch/dinov2', args.model).to(device)
+        model = torch.hub.load("facebookresearch/dinov2", args.model)
     elif args.model.startswith("dino"):
-        model = torch.hub.load("facebookresearch/dino:main", args.model).to(device)
+        model = torch.hub.load("facebookresearch/dino:main", args.model)
     elif args.model.startswith("ibot"):
-        model = get_ibot_model_by_name(args.model).to(device)
+        model = get_ibot_model_by_name(args.model)
+    elif args.model.startswith("cribo"):
+        model = get_cribo_model_by_name(args.model, student_or_teacher="teacher")
+    elif args.model.startswith("mae_vitb16"):
+        model = timm.create_model(
+            "vit_base_patch16_224.mae",
+            pretrained=True,
+            num_classes=0,
+            dynamic_img_size=True,
+            dynamic_img_pad=False,
+        )
     else:
         raise ValueError("Model not recognized")
-        
-    
+
+    model = model.to(device)
+
     # dinov2 return a tuple of (features, logits)
 
     if args.model.startswith("dinov2"):
+
         def token_features(model, imgs):
             return model.get_intermediate_layers(imgs)[0], None
+
     else:
         # dino and ibot
         def token_features(model, imgs):
             # for dino and ibot, we unselect the first token which is the [CLS] token
             return model.get_intermediate_layers(imgs)[0][:, 1:], None
-    
 
-    
     dataset_name = "voc"
     aug_epoch = 1
-    out_dir = os.path.join(args.out_dir, dataset_name, f"{args.model}_i{args.input_size}_p{args.patch_size}_e{args.embeddings_size}_m{args.memory_size}_a{aug_epoch}_b{args.batch_size}_s{args.seed}")
+    out_dir = os.path.join(
+        args.out_dir,
+        dataset_name,
+        f"{args.model}_i{args.input_size}_p{args.patch_size}_e{args.embeddings_size}_m{args.memory_size}_a{aug_epoch}_b{args.batch_size}_s{args.seed}",
+    )
     os.makedirs(out_dir, exist_ok=True)
 
     hbird_miou = hbird_evaluation(
@@ -48,7 +65,7 @@ def main(args):
         # Size of the embedding feature vectors of patches
         d_model=args.embeddings_size,
         patch_size=args.patch_size,
-        batch_size = args.batch_size,
+        batch_size=args.batch_size,
         input_size=args.input_size,
         # How many iterations of augmentations to use on top of the training dataset in order to generate the memory
         augmentation_epoch=aug_epoch,
@@ -89,21 +106,77 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HummingBird Evaluation")
 
     # Standard arguments
-    parser.add_argument("--seed", default=42, type=int, help="The seed for the random number generators")
+    parser.add_argument(
+        "--seed", default=42, type=int, help="The seed for the random number generators"
+    )
 
     # Model arguments
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--input-size", type=int, default=224, help="Size of the images fed to the model")
-    parser.add_argument("--patch-size", type=int, default=16, help="Size of the model patches")
-    parser.add_argument("--memory-size", type=int, default=None, help="The size of the memory bank. Unbounded if not specified")
-    parser.add_argument("--model", type=str, required=True, help="DINO model name")
-    parser.add_argument("--embeddings-size", type=int, required=True, help="The size of the model embeddings")
-    parser.add_argument("--use-faiss", action="store_true", help="Whether to use faiss for the k-NN operator")
+    parser.add_argument(
+        "--input-size",
+        type=int,
+        default=224,
+        help="Size of the images fed to the model",
+    )
+    parser.add_argument(
+        "--patch-size", type=int, default=16, help="Size of the model patches"
+    )
+    parser.add_argument(
+        "--memory-size",
+        type=int,
+        default=None,
+        help="The size of the memory bank. Unbounded if not specified",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        choices=[
+            "dino_vits16",
+            "dino_vitb16",
+            "dinov2_vits14",
+            "dinov2_vitb14",
+            "ibot_vits16",
+            "ibot_vitb16",
+            "mae_vitb16",
+            # TODO: for now I'm loading the teacher model by default
+            "cribo_vits16_coco",
+            "cribo_vitb16_in1k",
+            "cribo_vits16_in1k",
+        ],
+    )
+    parser.add_argument(
+        "--embeddings-size",
+        type=int,
+        required=True,
+        help="The size of the model embeddings",
+    )
+    parser.add_argument(
+        "--use-faiss",
+        action="store_true",
+        help="Whether to use faiss for the k-NN operator",
+    )
     # Data arguments
-    parser.add_argument("--data-dir", type=str, default="VOCSegmentation", help="Path to the VOC dataset")
-    parser.add_argument("--out-dir", type=str, default="out-cribo", help="Path to the output directory")
-    parser.add_argument("--num-workers", type=int, default=64, help="Number of workers for the dataloader")
-    parser.add_argument("--save-features", action="store_true", help="Whether to save the features and labels to the output directory")
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default="VOCSegmentation",
+        help="Path to the VOC dataset",
+    )
+    parser.add_argument(
+        "--out-dir", type=str, default="out-cribo", help="Path to the output directory"
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=64,
+        help="Number of workers for the dataloader",
+    )
+    parser.add_argument(
+        "--save-features",
+        action="store_true",
+        help="Whether to save the features and labels to the output directory",
+    )
     args = parser.parse_args()
 
     seed_everything(args.seed)

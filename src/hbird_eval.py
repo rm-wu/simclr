@@ -544,6 +544,7 @@ def hbird_evaluation(
         l_mem_p=l_mem_p,
         save_features=save_features,
         out_dir=out_dir,
+        use_faiss=use_faiss,
     )
     return evaluator.evaluate(
         val_loader, eval_spatial_resolution, return_knn_details=return_knn_details
