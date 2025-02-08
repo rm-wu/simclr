@@ -7,6 +7,7 @@ import timm
 from eval import seed_everything
 from src.models import get_ibot_model_by_name, get_cribo_model_by_name
 from src.ls_eval import ls_finetune
+from src.ls_utils import get_git_commit_hash
 
 
 def main(args):
@@ -47,14 +48,18 @@ def main(args):
         def token_features(model, imgs):
             return model.get_intermediate_layers(imgs)[0][:, 1:], None
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    args.out_dir = (
-        Path(args.out_dir)
-        / args.dataset_name
-        / f"{args.model}_i{args.input_size}_p{args.patch_size}_e{args.embeddings_size}_b{args.batch_size}_s{args.seed}"
-        / timestamp
-    )
+    args.out_dir = Path(args.out_dir)
     args.out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Determine checkpoint directory and file
+    checkpoint_dir = Path(args.out_dir)
+    commit_hash = get_git_commit_hash()[:7]
+    checkpoint_dir = (
+        checkpoint_dir
+        / f"{commit_hash}_{args.dataset_name}_{args.model}_lr{args.lr}_ep{args.max_epochs}_s{args.seed}"
+    )
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
     ls_finetune(
         backbone=model,
         patch_size=args.patch_size,
@@ -72,6 +77,9 @@ def main(args):
         train_mask_size=100,
         val_mask_size=100,
         device=device,
+        use_wandb=args.use_wandb,
+        checkpoint_dir=checkpoint_dir,
+        seed=args.seed,
     )
 
 
@@ -121,6 +129,12 @@ if __name__ == "__main__":
         "--save-features",
         action="store_true",
         help="Whether to save the features and labels to the output directory",
+    )
+
+    parser.add_argument(
+        "--use-wandb",
+        action="store_true",
+        help="Whether to use wandb to log the results",
     )
 
     args = parser.parse_args()

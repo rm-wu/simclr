@@ -1,8 +1,6 @@
 import torch
 from torch import nn
 from torch.optim.lr_scheduler import StepLR
-import torchvision.transforms as T
-from torchvision.transforms.functional import InterpolationMode
 import random
 from pathlib import Path
 
@@ -10,12 +8,13 @@ from typing import Callable
 import einops as ein
 from tqdm import tqdm, trange
 import numpy as np
+import wandb
 
 from src.dataset import VOCDataModule, Ade20kDataModule, CocoDataModule
 from src.ls_utils import PredsmIoU
 
 from src.transforms.image_transformations import (
-    SepTransforms,
+    # SepTransforms,
     Compose,
     Normalize,
     ToTensor,
@@ -23,7 +22,7 @@ from src.transforms.image_transformations import (
     RandomHorizontalFlip,
     RandomResizedCrop,
     Resize,
-    CombTransforms,
+    # CombTransforms,
 )
 
 
@@ -39,11 +38,14 @@ def ls_finetune(
     batch_size: int,
     dataset_name: str,
     data_dir: Path,
+    checkpoint_dir: Path,
+    seed: int,
     num_workers: int = 32,
     input_size: int = 448,
     train_mask_size: int = 100,
     val_mask_size: int = 100,
     device: torch.device = torch.device("cuda"),
+    use_wandb: bool = False,
 ):
     # TODO: These hyperparameters should be checked with the original code
     # input_size = args.input_size # 448
@@ -174,14 +176,48 @@ def ls_finetune(
     scheduler = StepLR(optimizer, gamma=decay_rate, step_size=drop_at)
 
     data_module.setup()
-    dataset_size = data_module.get_train_dataset_size()
+    # dataset_size = data_module.get_train_dataset_size()
     num_classes = data_module.get_num_classes()
     train_loader = data_module.train_dataloader()
     val_loader = data_module.val_dataloader()
     
     train_losses = []
-    pbar = trange(max_epochs, ncols=80)
+    
+    if use_wandb:
+        wandb.init(
+            project="ssl-ls-evaluation", 
+            name=f"{dataset_name}-{backbone.name}-{patch_size}-{input_size}-{train_mask_size}-{val_mask_size}",
+            config={
+                "dataset_name": dataset_name,
+                "backbone_name": backbone.name,
+                "patch_size": patch_size,
+                "input_size": input_size,
+                "train_mask_size": train_mask_size,
+                "val_mask_size": val_mask_size,
+                "lr": lr,
+                "decay_rate": decay_rate,
+                "drop_at": drop_at,
+                "max_epochs": max_epochs,
+            }
+        )
 
+    # Create checkpoint directory if it doesn't exist
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    # Determine checkpoint file path with additional parameters
+    checkpoint_file = checkpoint_dir / "checkpoint.pth"
+
+    # Load checkpoint if resume is True and checkpoint exists
+    start_epoch = 0
+    if checkpoint_file.exists():
+        checkpoint = torch.load(checkpoint_file)
+        linear_head.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        start_epoch = checkpoint['epoch'] + 1
+        print(f"Resuming training from epoch {start_epoch}")
+    
+    pbar = trange(start_epoch, max_epochs, ncols=80)
+    
     for epoch in pbar:
         pbar.set_description(f"Epoch [{epoch}]")
         pbar_iter = tqdm(train_loader, ncols=80)
@@ -216,10 +252,22 @@ def ls_finetune(
             optimizer.step()
             pbar_iter.set_postfix(loss=loss.item())
             train_losses.append(loss.item())
+            if use_wandb:
+                wandb.log({"train_loss": loss.item()})
 
         scheduler.step()
         print()
         print(f"Epoch [{epoch}/{max_epochs-1}]: mean loss : {np.mean(train_losses)}")
+
+        # Save checkpoint after each epoch
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': linear_head.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'lr_scheduler_state_dict': scheduler.state_dict(),
+            'max_epochs': max_epochs,
+            'seed': seed,
+        }, checkpoint_file)
 
         # Validation Step
         if epoch % 5 == 0 or epoch == max_epochs - 1:
@@ -261,6 +309,8 @@ def ls_finetune(
                 miou_metric.reset()
                 print(f"miou : {miou}")
                 print()
+                if use_wandb:
+                    wandb.log({"miou_val": miou})
 
     # model = LinearFinetune(
     #     patch_size=patch_size,
